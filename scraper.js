@@ -1,18 +1,20 @@
-require('dotenv').config(); // Bunu en üste ekle
+require('dotenv').config();
 const { Pool } = require('pg');
 const { chromium } = require('playwright');
+
+// Note: VisitMalta now uses direct API calls (no browser needed)
+// Only ShowsHappening still needs the browser
 
 const pool = new Pool({
   user: process.env.DB_USER,
   host: process.env.DB_HOST,
   database: process.env.DB_NAME,
-  password: process.env.DB_PASSWORD, // Şifreyi buradan çekecek
+  password: process.env.DB_PASSWORD,
   port: process.env.DB_PORT,
   ssl: { rejectUnauthorized: false }
 });
-// ... kodun geri kalanı aynı kalsın ...
 
-// --- 1. SHOWSHAPPENING (DOKUNULMADI - AYNI KOD) ---
+// --- 1. SHOWSHAPPENING (GELİŞTİRİLMİŞ - TARİH, FİYAT, KATEGORİ EKLENDİ) ---
 async function scrapeShowsHappening(browser) {
   const page = await browser.newPage();
   try {
@@ -34,26 +36,120 @@ async function scrapeShowsHappening(browser) {
 
     const events = await page.evaluate(() => {
       const anchors = Array.from(document.querySelectorAll('a'));
-      return anchors.map(a => ({
-        title: a.innerText.replace(/\n/g, ' ').trim(),
-        url: a.href,
-        image_url: a.querySelector('img') ? a.querySelector('img').src : null
-      })).filter(item => 
+      return anchors.map(a => {
+        const fullText = a.innerText.replace(/\n/g, '|||').trim(); // Use ||| as line separator
+        const lines = fullText.split('|||').map(l => l.trim()).filter(l => l.length > 0);
+        
+        // Try to identify date, title, and price from the lines
+        // Typical pattern: "Follow", "2 Jul", "Made in Malta", "€10 - €12"
+        let date = null;
+        let title = null;
+        let price = null;
+        
+        for (const line of lines) {
+          // Skip "Follow" text
+          if (line.toLowerCase() === 'follow') continue;
+          
+          // Detect price (contains € or "Free")
+          if (line.includes('€') || line.toLowerCase() === 'free') {
+            price = line;
+            continue;
+          }
+          
+          // Detect date patterns like "2 Jul", "14 Feb", "24,25,26 Apr", "Feb to May", "May to Sep"
+          const datePattern = /^(\d{1,2}[\s,]+)?(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i;
+          const dateRangePattern = /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+to\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i;
+          if (datePattern.test(line) || dateRangePattern.test(line)) {
+            date = line;
+            continue;
+          }
+          
+          // Everything else with reasonable length is a title
+          if (!title && line.length > 3 && line.length < 200) {
+            title = line;
+          }
+        }
+        
+        return {
+          title: title,
+          url: a.href,
+          image_url: a.querySelector('img') ? a.querySelector('img').src : null,
+          date: date,
+          price: price,
+        };
+      }).filter(item => 
         item.image_url && 
-        item.title.length > 15 && 
+        item.title &&
+        item.title.length > 5 && 
         item.title.length < 150 &&
         !item.title.toLowerCase().includes('seller test') &&
         !item.title.toLowerCase().startsWith('entertainment')
       );
     });
 
+    // Also try to scrape the search page for categories
+    let categoryMap = {};
+    try {
+      const categoryLinks = await page.evaluate(() => {
+        const links = Array.from(document.querySelectorAll('a[href*="category="]'));
+        const map = {};
+        links.forEach(link => {
+          const match = link.href.match(/category=([^&]+)/);
+          if (match) {
+            const category = decodeURIComponent(match[1]);
+            // Find nearby event links to associate categories
+            map[category] = true;
+          }
+        });
+        return Object.keys(map);
+      });
+      console.log(`  Kategoriler: ${categoryLinks.join(', ')}`);
+    } catch (e) { /* skip */ }
+
     for (const event of events) {
-      await pool.query(
-        'INSERT INTO events (title, location, source_url, image_url) VALUES ($1, $2, $3, $4) ON CONFLICT (source_url) DO UPDATE SET image_url = EXCLUDED.image_url',
-        [event.title.replace(/^Follow\s+/i, '').trim(), 'Malta', event.url, event.image_url]
-      );
+      try {
+        await pool.query(
+          `INSERT INTO events (title, location, source_url, image_url, event_date, description) 
+           VALUES ($1, $2, $3, $4, $5, $6) 
+           ON CONFLICT (source_url) DO UPDATE SET 
+             image_url = EXCLUDED.image_url,
+             event_date = COALESCE(EXCLUDED.event_date, events.event_date),
+             description = COALESCE(EXCLUDED.description, events.description)`,
+          [
+            event.title.replace(/^Follow\s+/i, '').trim(),
+            'Malta',
+            event.url,
+            event.image_url,
+            event.date || null,
+            event.price ? `Price: ${event.price}` : null  // Store price in description for now
+          ]
+        );
+      } catch (dbErr) {
+        // Fallback if table doesn't have new columns
+        if (dbErr.message.includes('column')) {
+          await pool.query(
+            'INSERT INTO events (title, location, source_url, image_url) VALUES ($1, $2, $3, $4) ON CONFLICT (source_url) DO UPDATE SET image_url = EXCLUDED.image_url',
+            [event.title.replace(/^Follow\s+/i, '').trim(), 'Malta', event.url, event.image_url]
+          );
+        }
+      }
     }
-    console.log(`ShowsHappening: ${events.length} etkinlik bulundu.`);
+
+    const withDates = events.filter(e => e.date).length;
+    const withPrices = events.filter(e => e.price).length;
+    console.log(`ShowsHappening: ${events.length} etkinlik bulundu (${withDates} tarihli, ${withPrices} fiyatlı).`);
+    
+    // Log samples
+    if (events.length > 0) {
+      console.log("\n  === ÖRNEK ETKİNLİKLER ===");
+      events.slice(0, 5).forEach(e => {
+        console.log(`  Başlık: ${e.title}`);
+        console.log(`  Tarih:  ${e.date || 'Bulunamadı'}`);
+        console.log(`  Fiyat:  ${e.price || 'Bulunamadı'}`);
+        console.log(`  URL:    ${e.url}`);
+        console.log(`  ---`);
+      });
+    }
   } catch (err) { console.error("SH Hatası:", err.message); }
   finally { await page.close(); }
 }
