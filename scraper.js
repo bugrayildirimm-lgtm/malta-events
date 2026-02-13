@@ -98,7 +98,19 @@ async function scrapeShowsHappening(browser) {
         item.title.length < 200 &&
         !item.title.toLowerCase().includes('seller test') &&
         !item.title.toLowerCase().startsWith('entertainment') &&
-        !item.title.toLowerCase().startsWith('showshappening')
+        !item.title.toLowerCase().startsWith('showshappening') &&
+        // Filter out non-event links
+        !item.url.includes('apple.com') &&
+        !item.url.includes('apps.apple') &&
+        !item.url.includes('play.google') &&
+        !item.url.includes('Account/Login') &&
+        !item.url.includes('showsmanager.com') &&
+        !item.url.includes('/search?') &&
+        !item.url.includes('/whatshappening') &&
+        !item.url.endsWith('showshappening.com/') &&
+        // Must be an event page URL (contains organizer/event-slug pattern)
+        item.url.includes('showshappening.com/') &&
+        item.url.split('showshappening.com/')[1]?.includes('/')
       );
     });
 
