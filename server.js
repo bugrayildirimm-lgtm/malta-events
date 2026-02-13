@@ -365,4 +365,267 @@ app.get('/', async (req, res) => {
   }
 });
 
+// =====================================================================
+// ADMIN PAGE - Manage event images
+// =====================================================================
+app.use(express.json());
+
+// Simple auth - change this password!
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'malta2026';
+
+app.get('/admin', (req, res) => {
+  res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Admin - Malta Events</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;700;900&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Outfit', sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
+    
+    .login-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+    .login-box { background: #1e293b; padding: 40px; border-radius: 16px; width: 350px; text-align: center; }
+    .login-box h2 { margin-bottom: 20px; font-size: 1.5rem; }
+    .login-box input { width: 100%; padding: 12px 16px; border-radius: 8px; border: 1px solid #334155; background: #0f172a; color: white; font-size: 1rem; margin-bottom: 15px; font-family: inherit; }
+    .login-box button { width: 100%; padding: 12px; border-radius: 8px; border: none; background: #FF385C; color: white; font-size: 1rem; font-weight: 700; cursor: pointer; font-family: inherit; }
+    .login-box button:hover { background: #e11d48; }
+    
+    .admin-panel { display: none; }
+    .admin-header { background: #1e293b; padding: 20px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; position: sticky; top: 0; z-index: 100; }
+    .admin-header h1 { font-size: 1.5rem; }
+    .admin-header .stats { color: #94a3b8; font-size: 0.9rem; }
+    .admin-header a { color: #FF385C; text-decoration: none; font-weight: 600; }
+    
+    .filters { background: #1e293b; padding: 15px 30px; display: flex; gap: 10px; align-items: center; border-bottom: 1px solid #334155; flex-wrap: wrap; }
+    .filters input, .filters select { padding: 8px 14px; border-radius: 8px; border: 1px solid #334155; background: #0f172a; color: white; font-family: inherit; font-size: 0.9rem; }
+    .filters input { flex: 1; min-width: 200px; }
+    .filter-btn { padding: 8px 16px; border-radius: 8px; border: 1px solid #334155; background: transparent; color: #94a3b8; cursor: pointer; font-family: inherit; font-size: 0.85rem; transition: 0.2s; }
+    .filter-btn:hover, .filter-btn.active { background: #FF385C; color: white; border-color: #FF385C; }
+    
+    .events-grid { padding: 20px 30px; display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 20px; }
+    
+    .event-card { background: #1e293b; border-radius: 12px; overflow: hidden; border: 1px solid #334155; transition: 0.2s; }
+    .event-card:hover { border-color: #475569; }
+    .event-card.has-image { opacity: 0.6; }
+    .event-card.has-image:hover { opacity: 1; }
+    
+    .event-preview { height: 140px; position: relative; background: #334155; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+    .event-preview img { width: 100%; height: 100%; object-fit: cover; }
+    .event-preview .no-img { color: #64748b; font-size: 0.85rem; }
+    .event-preview .badge { position: absolute; top: 8px; right: 8px; padding: 3px 10px; border-radius: 20px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; }
+    .badge.missing { background: #ef4444; color: white; }
+    .badge.has { background: #22c55e; color: white; }
+    
+    .event-info { padding: 15px; }
+    .event-info .source { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; color: #64748b; margin-bottom: 5px; }
+    .event-info .title { font-size: 1rem; font-weight: 700; margin-bottom: 5px; color: #f1f5f9; line-height: 1.3; }
+    .event-info .date { font-size: 0.8rem; color: #94a3b8; margin-bottom: 10px; }
+    
+    .image-input { display: flex; gap: 8px; padding: 0 15px 15px; }
+    .image-input input { flex: 1; padding: 8px 12px; border-radius: 8px; border: 1px solid #334155; background: #0f172a; color: white; font-size: 0.85rem; font-family: inherit; }
+    .image-input input:focus { outline: none; border-color: #FF385C; }
+    .image-input button { padding: 8px 16px; border-radius: 8px; border: none; background: #FF385C; color: white; font-weight: 700; cursor: pointer; font-size: 0.85rem; font-family: inherit; white-space: nowrap; }
+    .image-input button:hover { background: #e11d48; }
+    .image-input button:disabled { background: #334155; cursor: not-allowed; }
+    
+    .image-actions { padding: 0 15px 15px; display: flex; gap: 8px; }
+    .image-actions button { padding: 6px 12px; border-radius: 6px; border: 1px solid #334155; background: transparent; color: #94a3b8; cursor: pointer; font-size: 0.75rem; font-family: inherit; }
+    .image-actions button:hover { background: #334155; color: white; }
+    .image-actions .delete-btn:hover { background: #ef4444; border-color: #ef4444; color: white; }
+    
+    .toast { position: fixed; bottom: 30px; right: 30px; background: #22c55e; color: white; padding: 12px 24px; border-radius: 10px; font-weight: 600; display: none; z-index: 1000; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
+    .toast.error { background: #ef4444; }
+    .toast.show { display: block; animation: slideIn 0.3s ease; }
+    @keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    
+    .count-bar { padding: 10px 30px; background: #1e293b; border-bottom: 1px solid #334155; font-size: 0.85rem; color: #94a3b8; }
+    .count-bar span { color: #FF385C; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <div class="login-screen" id="loginScreen">
+    <div class="login-box">
+      <h2>🔐 Admin Login</h2>
+      <input type="password" id="passwordInput" placeholder="Enter admin password" onkeydown="if(event.key==='Enter')doLogin()">
+      <button onclick="doLogin()">Login</button>
+    </div>
+  </div>
+
+  <div class="admin-panel" id="adminPanel">
+    <div class="admin-header">
+      <div>
+        <h1>🎛️ Event Image Manager</h1>
+        <div class="stats" id="statsText">Loading...</div>
+      </div>
+      <a href="/">← Back to site</a>
+    </div>
+    
+    <div class="filters">
+      <input type="text" id="searchFilter" placeholder="🔍 Search events..." oninput="applyFilters()">
+      <select id="sourceFilter" onchange="applyFilters()">
+        <option value="all">All sources</option>
+        <option value="showshappening">ShowsHappening</option>
+        <option value="visitmalta">VisitMalta</option>
+      </select>
+      <button class="filter-btn active" onclick="setImageFilter('missing', this)">Missing images</button>
+      <button class="filter-btn" onclick="setImageFilter('has', this)">Has images</button>
+      <button class="filter-btn" onclick="setImageFilter('all', this)">All events</button>
+    </div>
+    
+    <div class="count-bar" id="countBar">Loading events...</div>
+    <div class="events-grid" id="eventsGrid"></div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    let allEvents = [];
+    let imageFilter = 'missing';
+    let authToken = '';
+
+    function doLogin() {
+      authToken = document.getElementById('passwordInput').value;
+      fetch('/admin/api/events', { headers: { 'Authorization': authToken } })
+        .then(r => { if (!r.ok) throw new Error('Wrong password'); return r.json(); })
+        .then(data => {
+          allEvents = data;
+          document.getElementById('loginScreen').style.display = 'none';
+          document.getElementById('adminPanel').style.display = 'block';
+          updateStats();
+          applyFilters();
+        })
+        .catch(() => showToast('Wrong password!', true));
+    }
+
+    function updateStats() {
+      const missing = allEvents.filter(e => !hasValidImage(e)).length;
+      const total = allEvents.length;
+      document.getElementById('statsText').textContent = total + ' total events · ' + missing + ' missing images';
+    }
+
+    function hasValidImage(e) {
+      return e.image_url && !e.image_url.includes('/api/v2/file/') && e.image_url.startsWith('http');
+    }
+
+    function setImageFilter(filter, btn) {
+      imageFilter = filter;
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      applyFilters();
+    }
+
+    function applyFilters() {
+      const search = document.getElementById('searchFilter').value.toLowerCase();
+      const source = document.getElementById('sourceFilter').value;
+      
+      let filtered = allEvents.filter(e => {
+        if (search && !e.title.toLowerCase().includes(search) && !(e.event_date||'').toLowerCase().includes(search)) return false;
+        if (source !== 'all' && !e.source_url.includes(source)) return false;
+        if (imageFilter === 'missing' && hasValidImage(e)) return false;
+        if (imageFilter === 'has' && !hasValidImage(e)) return false;
+        return true;
+      });
+
+      document.getElementById('countBar').innerHTML = 'Showing <span>' + filtered.length + '</span> events';
+      renderEvents(filtered);
+    }
+
+    function renderEvents(events) {
+      const grid = document.getElementById('eventsGrid');
+      grid.innerHTML = events.map(e => {
+        const hasImg = hasValidImage(e);
+        const source = e.source_url.includes('showshappening') ? 'ShowsHappening' : 
+                       e.source_url.includes('visitmalta') ? 'VisitMalta' : 'Unknown';
+        return '<div class="event-card ' + (hasImg ? 'has-image' : '') + '" data-id="' + e.id + '">' +
+          '<div class="event-preview">' +
+            (hasImg ? '<img src="' + e.image_url + '" onerror="this.parentElement.innerHTML=\\'<div class=no-img>Image broken</div>\\';">' : '<div class="no-img">No image</div>') +
+            '<div class="badge ' + (hasImg ? 'has' : 'missing') + '">' + (hasImg ? '✓ Has image' : '✗ No image') + '</div>' +
+          '</div>' +
+          '<div class="event-info">' +
+            '<div class="source">' + source + '</div>' +
+            '<div class="title">' + e.title + '</div>' +
+            '<div class="date">' + (e.event_date || 'No date') + ' · <a href="' + e.source_url + '" target="_blank" style="color:#FF385C;">View event ↗</a></div>' +
+          '</div>' +
+          '<div class="image-input">' +
+            '<input type="text" id="img-' + e.id + '" placeholder="Paste image URL..." value="' + (hasImg ? e.image_url : '') + '">' +
+            '<button onclick="saveImage(' + e.id + ')">Save</button>' +
+          '</div>' +
+          (hasImg ? '<div class="image-actions"><button class="delete-btn" onclick="removeImage(' + e.id + ')">Remove image</button></div>' : '') +
+        '</div>';
+      }).join('');
+    }
+
+    function saveImage(id) {
+      const input = document.getElementById('img-' + id);
+      const url = input.value.trim();
+      if (!url) return showToast('Please paste an image URL first', true);
+      if (!url.startsWith('http')) return showToast('URL must start with http', true);
+
+      fetch('/admin/api/events/' + id + '/image', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': authToken },
+        body: JSON.stringify({ image_url: url })
+      })
+      .then(r => { if (!r.ok) throw new Error('Failed'); return r.json(); })
+      .then(() => {
+        const evt = allEvents.find(e => e.id === id);
+        if (evt) evt.image_url = url;
+        updateStats();
+        applyFilters();
+        showToast('Image saved! ✓');
+      })
+      .catch(() => showToast('Failed to save', true));
+    }
+
+    function removeImage(id) {
+      if (!confirm('Remove this image?')) return;
+      fetch('/admin/api/events/' + id + '/image', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': authToken },
+        body: JSON.stringify({ image_url: null })
+      })
+      .then(r => { if (!r.ok) throw new Error('Failed'); return r.json(); })
+      .then(() => {
+        const evt = allEvents.find(e => e.id === id);
+        if (evt) evt.image_url = null;
+        updateStats();
+        applyFilters();
+        showToast('Image removed');
+      })
+      .catch(() => showToast('Failed to remove', true));
+    }
+
+    function showToast(msg, isError) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.className = 'toast show' + (isError ? ' error' : '');
+      setTimeout(() => t.className = 'toast', 3000);
+    }
+  </script>
+</body>
+</html>`);
+});
+
+// Admin API - Get all events
+app.get('/admin/api/events', (req, res) => {
+  if (req.headers.authorization !== (process.env.ADMIN_PASSWORD || 'malta2026')) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  pool.query('SELECT id, title, source_url, image_url, event_date, location, description FROM events ORDER BY title')
+    .then(r => res.json(r.rows))
+    .catch(e => res.status(500).json({ error: e.message }));
+});
+
+// Admin API - Update event image
+app.put('/admin/api/events/:id/image', (req, res) => {
+  if (req.headers.authorization !== (process.env.ADMIN_PASSWORD || 'malta2026')) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  const { image_url } = req.body;
+  pool.query('UPDATE events SET image_url = $1 WHERE id = $2', [image_url, req.params.id])
+    .then(() => res.json({ success: true }))
+    .catch(e => res.status(500).json({ error: e.message }));
+});
+
 app.listen(3000, () => console.log('Server running at http://localhost:3000'));
