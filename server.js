@@ -257,6 +257,13 @@ app.get('/', async (req, res) => {
 
     let upcoming = [], past = [];
 
+    // Pre-process: if title looks like a date and event_date is null, use title as date
+    allEvents.forEach(event => {
+        if (!event.event_date && looksLikeDate(event.title)) {
+          event.event_date = event.title;
+        }
+    });
+
     allEvents.forEach(event => {
         const endDate = getEndDate(event.event_date);
         const startDate = getStartDate(event.event_date);
@@ -265,7 +272,6 @@ app.get('/', async (req, res) => {
           // (ongoing event), treat it as "happening now" (sort near top)
           let sortDate = startDate;
           if (startDate && startDate < today) {
-            // Ongoing event — sort by today so it appears at the top
             sortDate = new Date(today);
           }
           upcoming.push({ ...event, _sort: sortDate });
