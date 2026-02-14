@@ -233,14 +233,15 @@ async function scrapeVisitMalta() {
     for (const event of events) {
       try {
         await pool.query(
-          `INSERT INTO events (title, location, source_url, image_url, event_date, description) 
-           VALUES ($1, $2, $3, $4, $5, $6) 
+          `INSERT INTO events (title, location, source_url, image_url, event_date, description, category) 
+           VALUES ($1, $2, $3, $4, $5, $6, $7) 
            ON CONFLICT (source_url) DO UPDATE SET 
              title = EXCLUDED.title,
              image_url = COALESCE(EXCLUDED.image_url, events.image_url),
              event_date = COALESCE(EXCLUDED.event_date, events.event_date),
-             description = COALESCE(EXCLUDED.description, events.description)`,
-          [event.title, event.location, event.url, event.image_url, event.date || null, event.description || null]
+             description = COALESCE(EXCLUDED.description, events.description),
+             category = COALESCE(EXCLUDED.category, events.category)`,
+          [event.title, event.location, event.url, event.image_url, event.date || null, event.description || null, event.category || null]
         );
       } catch (dbErr) {
         if (dbErr.message.includes('column') && (dbErr.message.includes('event_date') || dbErr.message.includes('description'))) {
