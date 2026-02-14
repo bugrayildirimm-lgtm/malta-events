@@ -168,10 +168,12 @@ function badge(top, bottom) {
 // CARD BUILDER
 // =====================================================================
 const createCard = (event, isPast) => {
-    let source = 'Other';
-    if (event.source_url && event.source_url.includes('showshappening')) source = 'ShowsHappening';
-    else if (event.source_url && event.source_url.includes('visitmalta')) source = 'VisitMalta';
-    else if (event.source_url && event.source_url.includes('eventbrite')) source = 'Eventbrite';
+    let source = event.source_name || 'Other';
+    if (!event.source_name) {
+      if (event.source_url && event.source_url.includes('showshappening')) source = 'ShowsHappening';
+      else if (event.source_url && event.source_url.includes('visitmalta')) source = 'VisitMalta';
+      else if (event.source_url && event.source_url.includes('eventbrite')) source = 'Eventbrite';
+    }
 
     let title = event.title || '';
     if (looksLikeDate(title) || title.startsWith('Price:') || title.includes('€')) {
@@ -257,9 +259,10 @@ app.get('/', async (req, res) => {
 
     allEvents.forEach(event => {
         // Collect filter data
-        if (event.source_url && event.source_url.includes('showshappening')) sources.add('ShowsHappening');
+        if (event.source_name) sources.add(event.source_name);
+        else if (event.source_url && event.source_url.includes('showshappening')) sources.add('ShowsHappening');
         else if (event.source_url && event.source_url.includes('visitmalta')) sources.add('VisitMalta');
-        else sources.add('Manual');
+        else if (event.source_url && event.source_url.includes('eventbrite')) sources.add('Eventbrite');
         if (event.location && event.location !== 'Malta') locations.add(event.location);
         if (event.category) categories.add(event.category);
 
@@ -275,16 +278,20 @@ app.get('/', async (req, res) => {
     });
 
     upcoming.sort((a,b) => {
-      if (!a._sort && !b._sort) return 0;
+      if (!a._sort && !b._sort) return (a.title||'').localeCompare(b.title||'');
       if (!a._sort) return 1;
       if (!b._sort) return -1;
-      return a._sort - b._sort;
+      const diff = a._sort - b._sort;
+      if (diff !== 0) return diff;
+      return (a.title||'').localeCompare(b.title||'');
     });
     past.sort((a,b) => {
-      if (!a._sort && !b._sort) return 0;
+      if (!a._sort && !b._sort) return (a.title||'').localeCompare(b.title||'');
       if (!a._sort) return 1;
       if (!b._sort) return -1;
-      return b._sort - a._sort;
+      const diff = b._sort - a._sort;
+      if (diff !== 0) return diff;
+      return (a.title||'').localeCompare(b.title||'');
     });
 
     // Build month filter options from upcoming events
@@ -667,7 +674,7 @@ app.get('/admin', (req, res) => {
         <div class="form-group"><label>Location <span class="req">*</span></label><input type="text" id="ae_loc" placeholder="e.g. Mediterranean Conference Centre, Valletta"></div>
         <div class="form-group"><label>Category <span class="req">*</span></label><select id="ae_cat" style="width:100%;padding:10px 14px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:white;font-family:inherit;font-size:0.9rem"><option value="">Select category...</option><option value="Music & Concerts">🎵 Music & Concerts</option><option value="Theatre & Shows">🎭 Theatre & Shows</option><option value="Dance">💃 Dance</option><option value="Nightlife & Parties">🎉 Nightlife & Parties</option><option value="Festivals">🎪 Festivals</option><option value="Arts & Culture">🎨 Arts & Culture</option><option value="Sports & Adventure">🏃 Sports & Adventure</option><option value="Food & Drink">🍷 Food & Drink</option><option value="Family">👨‍👩‍👧 Family</option><option value="Religious">⛪ Religious</option><option value="Conference">📋 Conference</option><option value="Other">📌 Other</option></select></div>
         <div class="form-group"><label>Image URL</label><input type="text" id="ae_img" placeholder="https://..."><div class="hint">Paste a direct link to the event image (right-click image → Copy image address)</div></div>
-        <div class="form-group"><label>Source <span class="req">*</span></label><select id="ae_source" style="width:100%;padding:10px 14px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:white;font-family:inherit;font-size:0.9rem"><option value="">Select source...</option><option value="showshappening">ShowsHappening</option><option value="visitmalta">VisitMalta</option><option value="eventbrite">Eventbrite</option><option value="other">Other</option></select><div class="hint">Where did you find this event?</div></div>
+        <div class="form-group"><label>Source <span class="req">*</span></label><input type="text" id="ae_source" placeholder="e.g. ShowsHappening, VisitMalta, Eventbrite, DJ Malta Events..."><div class="hint">Where did you find this event? This appears as the source tag on the site</div></div>
         <div class="form-group"><label>Event/Ticket URL <span class="req">*</span></label><input type="text" id="ae_url" placeholder="https://... link to event page or ticket sales"><div class="hint">The link users will go to when they click Details</div></div>
         <div class="form-group"><label>Description</label><textarea id="ae_desc" placeholder="Brief description of the event..."></textarea></div>
         <button class="form-btn" onclick="addEvent()">Add Event</button>
@@ -831,10 +838,8 @@ function addEvent(){
   if(!date)return toast('Date is required',1);
   if(!loc)return toast('Location is required',1);
   if(!cat)return toast('Category is required',1);
-  var sourceUrl=url;
-  if(src==='showshappening'&&url.indexOf('showshappening')<0)sourceUrl='https://www.showshappening.com/ref/'+encodeURIComponent(url);
-  if(src==='visitmalta'&&url.indexOf('visitmalta')<0)sourceUrl='https://www.visitmalta.com/ref/'+encodeURIComponent(url);
-  api('POST','/admin/api/events',{title:title,event_date:date,location:loc,category:cat,image_url:img,source_url:sourceUrl,description:desc},function(d){
+  var sourceUrl=url||'manual://added';
+  api('POST','/admin/api/events',{title:title,event_date:date,location:loc,category:cat,image_url:img,source_url:sourceUrl,description:desc,source_name:src},function(d){
     E.push(d.event);us();toast('Event added! \\u2713');
     ['ae_title','ae_date','ae_loc','ae_img','ae_url','ae_desc'].forEach(function(id){document.getElementById(id).value=''});
     document.getElementById('ae_cat').value='';
@@ -870,7 +875,7 @@ function getSource(e){
   if(e.source_url.indexOf('visitmalta')>-1)return 'visitmalta';
   return 'manual';
 }
-function getSrc(e){var s=getSource(e);return s==='showshappening'?'ShowsHappening':s==='visitmalta'?'VisitMalta':'Manual'}
+function getSrc(e){if(e.source_name)return e.source_name;var s=getSource(e);return s==='showshappening'?'ShowsHappening':s==='visitmalta'?'VisitMalta':'Other'}
 function ue(id,f,v){var e=E.find(function(x){return x.id===id});if(e)e[f]=v;us();if(tab==='images')af1();else if(tab==='dates')af2();else if(tab==='categories')af3()}
 function api(method,url,body,cb){
   fetch(url,{method:method,headers:{'Content-Type':'application/json',Authorization:auth},body:JSON.stringify(body)})
@@ -892,11 +897,11 @@ app.get('/admin/api/events', async (req, res) => {
     // Try with category column first, fallback without it
     let result;
     try {
-      result = await pool.query('SELECT id, title, source_url, image_url, event_date, location, description, category FROM events ORDER BY title');
+      result = await pool.query('SELECT id, title, source_url, image_url, event_date, location, description, category, source_name FROM events ORDER BY title');
     } catch (e) {
-      // category column might not exist yet
+      // source_name or category column might not exist yet
       result = await pool.query('SELECT id, title, source_url, image_url, event_date, location, description FROM events ORDER BY title');
-      result.rows = result.rows.map(r => ({ ...r, category: null }));
+      result.rows = result.rows.map(r => ({ ...r, category: null, source_name: null }));
     }
     res.json(result.rows);
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -963,19 +968,22 @@ app.put('/admin/api/events/:id/date', (req, res) => {
 app.post('/admin/api/events', async (req, res) => {
   if (!authCheck(req, res)) return;
   try {
-    const { title, event_date, location, image_url, source_url, description, category } = req.body;
+    const { title, event_date, location, image_url, source_url, description, category, source_name } = req.body;
     if (!title || !event_date || !location) return res.status(400).json({ error: 'Title, date, and location are required' });
+    
+    // Ensure source_name column exists
+    await pool.query('ALTER TABLE events ADD COLUMN IF NOT EXISTS source_name TEXT').catch(()=>{});
+    
     let result;
     try {
       result = await pool.query(
-        'INSERT INTO events (title, event_date, location, image_url, source_url, description, category) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *',
-        [title, event_date, location || 'Malta', image_url || null, source_url || 'manual://added', description || null, category || null]
+        'INSERT INTO events (title, event_date, location, image_url, source_url, description, category, source_name) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *',
+        [title, event_date, location || 'Malta', image_url || null, source_url || 'manual://added', description || null, category || null, source_name || null]
       );
     } catch (e) {
-      // category column might not exist
       result = await pool.query(
-        'INSERT INTO events (title, event_date, location, image_url, source_url, description) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *',
-        [title, event_date, location || 'Malta', image_url || null, source_url || 'manual://added', description || null]
+        'INSERT INTO events (title, event_date, location, image_url, source_url, description, category) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *',
+        [title, event_date, location || 'Malta', image_url || null, source_url || 'manual://added', description || null, category || null]
       );
     }
     res.json({ success: true, event: result.rows[0] });
