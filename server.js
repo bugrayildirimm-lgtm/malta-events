@@ -209,7 +209,7 @@ const createCard = (event, isPast) => {
         <div class="card-media">
             ${dateHTML} ${expired}
             <div class="fallback" style="background: ${bgStyle}; position:absolute;top:0;left:0;z-index:1;">${firstLetter}</div>
-            ${hasImg ? '<img src="' + event.image_url + '" class="card-img" style="position:relative;z-index:2;" onerror="this.style.display=\'none\'">' : ''}
+            ${hasImg ? '<img src="' + event.image_url + '" class="card-img" style="position:relative;z-index:2;" onerror="this.hidden=1">' : ''}
         </div>
         <div class="card-content">
             <div class="source-tag">${source}</div>
@@ -685,194 +685,181 @@ app.get('/admin', (req, res) => {
 
   <div class="toast" id="toast"></div>
 
-  <script>
-    var E=[],tab='images',sf1v='missing',sf2v='missing',auth='';
-    function esc(s){if(!s)return'';return s.replace(/&/g,'&amp;').replace(/\x3c/g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
-    function doLogin(){
-      auth=document.getElementById('pw').value;
-      fetch('/admin/api/events',{headers:{Authorization:auth}})
-        .then(function(r){
-          if(!r.ok)throw new Error('auth');
-          return r.json();
-        })
-        .then(function(d){
-          E=d;
-          document.getElementById('LS').style.display='none';
-          document.getElementById('AP').style.display='block';
-          try{us()}catch(e){console.error('us error',e)}
-          try{af1()}catch(e){console.error('af1 error',e)}
-          try{af2()}catch(e){console.error('af2 error',e)}
-          try{af3()}catch(e){console.error('af3 error',e)}
-          try{loadAnalytics()}catch(e){console.error('analytics error',e)}
-        })
-        .catch(function(e){
-          if(e&&e.message==='auth')toast('Wrong password!',1);
-          else{console.error('Login error:',e);toast('Error: '+e,1)}
-        });
-    }
-
-    function us(){
-      var mi=E.filter(function(e){return!vi(e)}).length;
-      var md=E.filter(function(e){return!e.event_date}).length;
-      var mc=E.filter(function(e){return!e.category}).length;
-      document.getElementById('st').textContent=E.length+' events · '+mi+' missing images · '+md+' missing dates · '+mc+' uncategorized';
-      document.getElementById('ic').textContent=mi;
-      document.getElementById('dc').textContent=md;
-      document.getElementById('cc').textContent=mc;
-    }
-
-    function vi(e){return e.image_url&&e.image_url.indexOf('/api/v2/file/')<0&&e.image_url.indexOf('http')===0}
-
-    function switchTab(t,el){
-      tab=t;
-      document.querySelectorAll('.tab').forEach(function(x){x.classList.remove('active')});
-      el.classList.add('active');
-      ['imagesTab','datesTab','categoriesTab','addTab','analyticsTab'].forEach(function(id){document.getElementById(id).style.display='none'});
-      document.getElementById(t==='images'?'imagesTab':t==='dates'?'datesTab':t==='categories'?'categoriesTab':t==='add'?'addTab':'analyticsTab').style.display='';
-      if(t==='analytics')loadAnalytics();
-    }
-
-    // IMAGES
-    function ssf(f,b){sf1v=f;document.querySelectorAll('#imagesTab .fb').forEach(function(x){x.classList.remove('active')});b.classList.add('active');af1()}
-    function af1(){
-      var q=document.getElementById('sf1').value.toLowerCase(),s=document.getElementById('ss1').value;
-      var f=E.filter(function(e){
-        if(q&&e.title.toLowerCase().indexOf(q)<0)return 0;
-        if(s!=='all'&&getSource(e)!==s)return 0;
-        if(sf1v==='missing'&&vi(e))return 0;
-        if(sf1v==='has'&&!vi(e))return 0;
-        return 1;
-      });
-      document.getElementById('cb1').innerHTML='Showing <span>'+f.length+'</span>';
-      ri(f);
-    }
-    function ri(evts){
-      document.getElementById('eg1').innerHTML=evts.map(function(e){
-        var h=vi(e),s=getSrc(e);
-        return '<div class="ec'+(h?' dim':'')+'"><div class="ep">'+(h?'<img src="'+esc(e.image_url)+'" onerror="this.style.display=\'none\'">':'<div class="ni">No image</div>')+'<div class="bdg '+(h?'ok':'miss')+'">'+(h?'✓':'✗')+'</div></div><div class="ei"><div class="src">'+s+'</div><div class="ttl">'+esc(e.title)+'</div><div class="mt">'+esc(e.event_date||'No date')+' · <a href="'+esc(e.source_url)+'" target="_blank">View ↗</a></div></div><div class="fr"><input id="img-'+e.id+'" placeholder="Paste image URL..." value="'+esc(h?e.image_url:'')+'"><button onclick="si('+e.id+')">Save</button></div>'+(h?'<div class="fa"><button class="del" onclick="rmi('+e.id+')">Remove</button></div>':'')+'</div>';
-      }).join('');
-    }
-    function si(id){
-      var u=document.getElementById('img-'+id).value.trim();
-      if(!u||u.indexOf('http')!==0)return toast('Enter a valid URL',1);
-      api('PUT','/admin/api/events/'+id+'/image',{image_url:u},function(){ue(id,'image_url',u);toast('Saved ✓')});
-    }
-    function rmi(id){if(!confirm('Remove?'))return;api('PUT','/admin/api/events/'+id+'/image',{image_url:null},function(){ue(id,'image_url',null);toast('Removed')})}
-
-    // DATES
-    function sdf(f,b){sf2v=f;document.querySelectorAll('#datesTab .fb').forEach(function(x){x.classList.remove('active')});b.classList.add('active');af2()}
-    function af2(){
-      var q=document.getElementById('sf2').value.toLowerCase(),s=document.getElementById('ss2').value;
-      var f=E.filter(function(e){
-        if(q&&e.title.toLowerCase().indexOf(q)<0)return 0;
-        if(s!=='all'&&getSource(e)!==s)return 0;
-        if(sf2v==='missing'&&e.event_date)return 0;
-        if(sf2v==='has'&&!e.event_date)return 0;
-        return 1;
-      });
-      document.getElementById('cb2').innerHTML='Showing <span>'+f.length+'</span>';
-      rd(f);
-    }
-    function rd(evts){
-      document.getElementById('eg2').innerHTML=evts.map(function(e){
-        var hd=!!e.event_date,h=vi(e),s=getSrc(e);
-        return '<div class="ec'+(hd?' dim':'')+'"><div class="ep">'+(h?'<img src="'+esc(e.image_url)+'" onerror="this.style.display=\'none\'">':'<div class="ni">No img</div>')+'<div class="bdg '+(hd?'ok':'warn')+'">'+(hd?'✓ '+esc(e.event_date):'✗ No date')+'</div></div><div class="ei"><div class="src">'+s+'</div><div class="ttl">'+esc(e.title)+'</div><div class="mt"><a href="'+esc(e.source_url||'#')+'" target="_blank">View event ↗</a></div></div><div class="fr"><input id="dt-'+e.id+'" placeholder="e.g. 14 Feb or 20,21 Mar" value="'+esc(e.event_date||'')+'"><button onclick="sd('+e.id+')">Save</button></div><div class="dh"><div class="dh-t">Quick formats:</div><div class="dc"><span class="chip" onclick="sdv('+e.id+',\'14 Feb\')">14 Feb</span><span class="chip" onclick="sdv('+e.id+',\'20,21 Mar\')">20,21 Mar</span><span class="chip" onclick="sdv('+e.id+',\'Feb to May\')">Feb to May</span><span class="chip" onclick="sdv('+e.id+',\'14 Feb to 28 Mar\')">14 Feb to 28 Mar</span></div></div>'+(hd?'<div class="fa"><button class="del" onclick="rmd('+e.id+')">Clear</button></div>':'')+'</div>';
-      }).join('');
-    }
-    function sdv(id,v){document.getElementById('dt-'+id).value=v;document.getElementById('dt-'+id).focus()}
-    function sd(id){
-      var v=document.getElementById('dt-'+id).value.trim();
-      if(!v)return toast('Enter a date',1);
-      api('PUT','/admin/api/events/'+id+'/date',{event_date:v},function(d){
-        if(d.warning)toast('Saved but: '+d.warning,1);else toast('Date saved ✓');
-        ue(id,'event_date',v);
-      });
-    }
-    function rmd(id){if(!confirm('Clear?'))return;api('PUT','/admin/api/events/'+id+'/date',{event_date:null},function(){ue(id,'event_date',null);toast('Cleared')})}
-
-    // CATEGORIES
-    var sf3v='missing';
-    function scf(f,b){sf3v=f;document.querySelectorAll('#categoriesTab .fb').forEach(function(x){x.classList.remove('active')});b.classList.add('active');af3()}
-    function af3(){
-      var q=document.getElementById('sf3').value.toLowerCase();
-      var f=E.filter(function(e){
-        if(q&&e.title.toLowerCase().indexOf(q)<0)return 0;
-        if(sf3v==='missing'&&e.category)return 0;
-        if(sf3v==='has'&&!e.category)return 0;
-        return 1;
-      });
-      document.getElementById('cb3').innerHTML='Showing <span>'+f.length+'</span>';
-      rc(f);
-    }
-    function rc(evts){
-      var cats='<option value="">Select...</option><option value="Music & Concerts">🎵 Music & Concerts</option><option value="Theatre & Shows">🎭 Theatre & Shows</option><option value="Dance">💃 Dance</option><option value="Nightlife & Parties">🎉 Nightlife & Parties</option><option value="Festivals">🎪 Festivals</option><option value="Arts & Culture">🎨 Arts & Culture</option><option value="Sports & Adventure">🏃 Sports & Adventure</option><option value="Food & Drink">🍷 Food & Drink</option><option value="Family">👨‍👩‍👧 Family</option><option value="Religious">⛪ Religious</option><option value="Conference">📋 Conference</option><option value="Other">📌 Other</option>';
-      document.getElementById('eg3').innerHTML=evts.map(function(e){
-        var h=vi(e),s=getSrc(e);
-        var selCats=cats.replace('value="'+(e.category||'')+'"','value="'+(e.category||'')+'" selected');
-        return '<div class="ec'+(e.category?' dim':'')+'"><div class="ep">'+(h?'<img src="'+esc(e.image_url)+'" onerror="this.style.display=\'none\'">':'<div class="ni">No img</div>')+'<div class="bdg '+(e.category?'ok':'warn')+'">'+(e.category||'No category')+'</div></div><div class="ei"><div class="src">'+s+'</div><div class="ttl">'+esc(e.title)+'</div><div class="mt">'+esc(e.event_date||'No date')+'</div></div><div class="fr"><select id="cat-'+e.id+'" style="flex:1;padding:8px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:white;font-family:inherit;font-size:0.8rem">'+selCats+'</select><button onclick="sc('+e.id+')">Save</button></div></div>';
-      }).join('');
-    }
-    function sc(id){
-      var v=document.getElementById('cat-'+id).value;
-      if(!v)return toast('Select a category',1);
-      api('PUT','/admin/api/events/'+id+'/category',{category:v},function(){ue(id,'category',v);toast('Category saved ✓')});
-    }
-
-    // ADD EVENT
-    function addEvent(){
-      var title=document.getElementById('ae_title').value.trim();
-      var date=document.getElementById('ae_date').value.trim();
-      var loc=document.getElementById('ae_loc').value.trim();
-      var cat=document.getElementById('ae_cat').value;
-      var img=document.getElementById('ae_img').value.trim()||null;
-      var url=document.getElementById('ae_url').value.trim()||null;
-      var desc=document.getElementById('ae_desc').value.trim()||null;
-      if(!title)return toast('Title is required',1);
-      if(!date)return toast('Date is required',1);
-      if(!loc)return toast('Location is required',1);
-      if(!cat)return toast('Category is required',1);
-      api('POST','/admin/api/events',{title:title,event_date:date,location:loc,category:cat,image_url:img,source_url:url,description:desc},function(d){
-        E.push(d.event);
-        us();
-        toast('Event added! ✓');
-        ['ae_title','ae_date','ae_loc','ae_img','ae_url','ae_desc'].forEach(function(id){document.getElementById(id).value=''});
-        document.getElementById('ae_cat').value='';
-      });
-    }
-
-    // ANALYTICS
-    function loadAnalytics(){
-      fetch('/admin/api/analytics',{headers:{Authorization:auth}})
-        .then(function(r){return r.json()})
-        .then(function(d){
-          document.getElementById('statCards').innerHTML=
-            '<div class="sc"><div class="num">'+d.total_clicks+'</div><div class="lbl">Total Clicks</div></div>'+
-            '<div class="sc"><div class="num">'+d.today_clicks+'</div><div class="lbl">Today</div></div>'+
-            '<div class="sc"><div class="num">'+d.week_clicks+'</div><div class="lbl">This Week</div></div>'+
-            '<div class="sc"><div class="num">'+d.unique_events+'</div><div class="lbl">Unique Events</div></div>';
-          document.getElementById('clickBody').innerHTML=d.top_events.map(function(e){
-            return '<tr><td>'+e.event_title+'</td><td>'+e.source+'</td><td><strong>'+e.clicks+'</strong></td></tr>';
-          }).join('')||'<tr><td colspan="3" style="color:#64748b">No clicks yet</td></tr>';
-        }).catch(function(){});
-    }
-
-    // HELPERS
-    function getSource(e){
-      if(!e.source_url)return 'manual';
-      if(e.source_url.indexOf('showshappening')>-1)return 'showshappening';
-      if(e.source_url.indexOf('visitmalta')>-1)return 'visitmalta';
-      return 'manual';
-    }
-    function getSrc(e){var s=getSource(e);return s==='showshappening'?'ShowsHappening':s==='visitmalta'?'VisitMalta':'Manual'}
-    function ue(id,f,v){var e=E.find(function(x){return x.id===id});if(e)e[f]=v;us();if(tab==='images')af1();else if(tab==='dates')af2();else if(tab==='categories')af3()}
-    function api(method,url,body,cb){
-      fetch(url,{method:method,headers:{'Content-Type':'application/json',Authorization:auth},body:JSON.stringify(body)})
-        .then(function(r){if(!r.ok)throw 0;return r.json()}).then(cb).catch(function(){toast('Failed',1)});
-    }
-    function toast(m,e){var t=document.getElementById('toast');t.textContent=m;t.className='toast show'+(e?' err':'');setTimeout(function(){t.className='toast'},3000)}
-  </script>
+  <script src="/admin/js"></script>
 </body>
 </html>`);
+});
+
+
+// Admin JS - served as separate file to avoid template escaping issues
+app.get('/admin/js', (req, res) => {
+  res.type('application/javascript').send(`
+var E=[],tab='images',sf1v='missing',sf2v='missing',auth='';
+function esc(s){if(!s)return'';var d=document.createElement('div');d.textContent=s;return d.innerHTML}
+function doLogin(){
+  auth=document.getElementById('pw').value;
+  fetch('/admin/api/events',{headers:{Authorization:auth}})
+    .then(function(r){if(!r.ok)throw new Error('auth');return r.json()})
+    .then(function(d){
+      E=d;
+      document.getElementById('LS').style.display='none';
+      document.getElementById('AP').style.display='block';
+      try{us()}catch(e){console.error('us',e)}
+      try{af1()}catch(e){console.error('af1',e)}
+      try{af2()}catch(e){console.error('af2',e)}
+      try{af3()}catch(e){console.error('af3',e)}
+      try{loadAnalytics()}catch(e){console.error('analytics',e)}
+    })
+    .catch(function(e){
+      if(e&&e.message==='auth')toast('Wrong password!',1);
+      else{console.error('Login:',e);toast('Error: '+e,1)}
+    });
+}
+function us(){
+  var mi=E.filter(function(e){return!vi(e)}).length;
+  var md=E.filter(function(e){return!e.event_date}).length;
+  var mc=E.filter(function(e){return!e.category}).length;
+  document.getElementById('st').textContent=E.length+' events \\u00b7 '+mi+' missing images \\u00b7 '+md+' missing dates \\u00b7 '+mc+' uncategorized';
+  document.getElementById('ic').textContent=mi;
+  document.getElementById('dc').textContent=md;
+  document.getElementById('cc').textContent=mc;
+}
+function vi(e){return e.image_url&&e.image_url.indexOf('/api/v2/file/')<0&&e.image_url.indexOf('http')===0}
+function switchTab(t,el){
+  tab=t;
+  document.querySelectorAll('.tab').forEach(function(x){x.classList.remove('active')});
+  el.classList.add('active');
+  ['imagesTab','datesTab','categoriesTab','addTab','analyticsTab'].forEach(function(id){document.getElementById(id).style.display='none'});
+  var map={images:'imagesTab',dates:'datesTab',categories:'categoriesTab',add:'addTab',analytics:'analyticsTab'};
+  document.getElementById(map[t]).style.display='';
+  if(t==='analytics')loadAnalytics();
+}
+function ssf(f,b){sf1v=f;document.querySelectorAll('#imagesTab .fb').forEach(function(x){x.classList.remove('active')});b.classList.add('active');af1()}
+function af1(){
+  var q=document.getElementById('sf1').value.toLowerCase(),s=document.getElementById('ss1').value;
+  var f=E.filter(function(e){
+    if(q&&e.title.toLowerCase().indexOf(q)<0)return 0;
+    if(s!=='all'&&getSource(e)!==s)return 0;
+    if(sf1v==='missing'&&vi(e))return 0;
+    if(sf1v==='has'&&!vi(e))return 0;
+    return 1;
+  });
+  document.getElementById('cb1').innerHTML='Showing <span>'+f.length+'<\\/span>';
+  ri(f);
+}
+function ri(evts){
+  document.getElementById('eg1').innerHTML=evts.map(function(e){
+    var h=vi(e),s=getSrc(e);
+    return '<div class="ec'+(h?' dim':'')+'"><div class="ep">'+(h?'<img src="'+esc(e.image_url)+'" onerror="this.hidden=1">':'<div class="ni">No image<\\/div>')+'<div class="bdg '+(h?'ok':'miss')+'">'+(h?'\\u2713':'\\u2717')+'<\\/div><\\/div><div class="ei"><div class="src">'+s+'<\\/div><div class="ttl">'+esc(e.title)+'<\\/div><div class="mt">'+esc(e.event_date||'No date')+' \\u00b7 <a href="'+esc(e.source_url)+'" target="_blank">View \\u2197<\\/a><\\/div><\\/div><div class="fr"><input id="img-'+e.id+'" placeholder="Paste image URL..." value="'+esc(h?e.image_url:'')+'"><button onclick="si('+e.id+')">Save<\\/button><\\/div>'+(h?'<div class="fa"><button class="del" onclick="rmi('+e.id+')">Remove<\\/button><\\/div>':'')+'<\\/div>';
+  }).join('');
+}
+function si(id){
+  var u=document.getElementById('img-'+id).value.trim();
+  if(!u||u.indexOf('http')!==0)return toast('Enter a valid URL',1);
+  api('PUT','/admin/api/events/'+id+'/image',{image_url:u},function(){ue(id,'image_url',u);toast('Saved \\u2713')});
+}
+function rmi(id){if(!confirm('Remove?'))return;api('PUT','/admin/api/events/'+id+'/image',{image_url:null},function(){ue(id,'image_url',null);toast('Removed')})}
+function sdf(f,b){sf2v=f;document.querySelectorAll('#datesTab .fb').forEach(function(x){x.classList.remove('active')});b.classList.add('active');af2()}
+function af2(){
+  var q=document.getElementById('sf2').value.toLowerCase(),s=document.getElementById('ss2').value;
+  var f=E.filter(function(e){
+    if(q&&e.title.toLowerCase().indexOf(q)<0)return 0;
+    if(s!=='all'&&getSource(e)!==s)return 0;
+    if(sf2v==='missing'&&e.event_date)return 0;
+    if(sf2v==='has'&&!e.event_date)return 0;
+    return 1;
+  });
+  document.getElementById('cb2').innerHTML='Showing <span>'+f.length+'<\\/span>';
+  rd(f);
+}
+function rd(evts){
+  document.getElementById('eg2').innerHTML=evts.map(function(e){
+    var hd=!!e.event_date,h=vi(e),s=getSrc(e);
+    return '<div class="ec'+(hd?' dim':'')+'"><div class="ep">'+(h?'<img src="'+esc(e.image_url)+'" onerror="this.hidden=1">':'<div class="ni">No img<\\/div>')+'<div class="bdg '+(hd?'ok':'warn')+'">'+(hd?'\\u2713 '+esc(e.event_date):'\\u2717 No date')+'<\\/div><\\/div><div class="ei"><div class="src">'+s+'<\\/div><div class="ttl">'+esc(e.title)+'<\\/div><div class="mt"><a href="'+esc(e.source_url||'#')+'" target="_blank">View event \\u2197<\\/a><\\/div><\\/div><div class="fr"><input id="dt-'+e.id+'" placeholder="e.g. 14 Feb or 20,21 Mar" value="'+esc(e.event_date||'')+'"><button onclick="sd('+e.id+')">Save<\\/button><\\/div><div class="dh"><div class="dh-t">Quick formats:<\\/div><div class="dc"><span class="chip" onclick="sdv('+e.id+',\\x2714 Feb\\x27)">14 Feb<\\/span><span class="chip" onclick="sdv('+e.id+',\\x2720,21 Mar\\x27)">20,21 Mar<\\/span><span class="chip" onclick="sdv('+e.id+',\\x27Feb to May\\x27)">Feb to May<\\/span><span class="chip" onclick="sdv('+e.id+',\\x2714 Feb to 28 Mar\\x27)">14 Feb to 28 Mar<\\/span><\\/div><\\/div>'+(hd?'<div class="fa"><button class="del" onclick="rmd('+e.id+')">Clear<\\/button><\\/div>':'')+'<\\/div>';
+  }).join('');
+}
+function sdv(id,v){document.getElementById('dt-'+id).value=v;document.getElementById('dt-'+id).focus()}
+function sd(id){
+  var v=document.getElementById('dt-'+id).value.trim();
+  if(!v)return toast('Enter a date',1);
+  api('PUT','/admin/api/events/'+id+'/date',{event_date:v},function(d){
+    if(d.warning)toast('Saved but: '+d.warning,1);else toast('Date saved \\u2713');
+    ue(id,'event_date',v);
+  });
+}
+function rmd(id){if(!confirm('Clear?'))return;api('PUT','/admin/api/events/'+id+'/date',{event_date:null},function(){ue(id,'event_date',null);toast('Cleared')})}
+var sf3v='missing';
+function scf(f,b){sf3v=f;document.querySelectorAll('#categoriesTab .fb').forEach(function(x){x.classList.remove('active')});b.classList.add('active');af3()}
+function af3(){
+  var q=document.getElementById('sf3').value.toLowerCase();
+  var f=E.filter(function(e){
+    if(q&&e.title.toLowerCase().indexOf(q)<0)return 0;
+    if(sf3v==='missing'&&e.category)return 0;
+    if(sf3v==='has'&&!e.category)return 0;
+    return 1;
+  });
+  document.getElementById('cb3').innerHTML='Showing <span>'+f.length+'<\\/span>';
+  rc(f);
+}
+function rc(evts){
+  var cats='<option value="">Select...<\\/option><option value="Music & Concerts">\\ud83c\\udfb5 Music & Concerts<\\/option><option value="Theatre & Shows">\\ud83c\\udfad Theatre & Shows<\\/option><option value="Dance">\\ud83d\\udc83 Dance<\\/option><option value="Nightlife & Parties">\\ud83c\\udf89 Nightlife & Parties<\\/option><option value="Festivals">\\ud83c\\udfaa Festivals<\\/option><option value="Arts & Culture">\\ud83c\\udfa8 Arts & Culture<\\/option><option value="Sports & Adventure">\\ud83c\\udfc3 Sports & Adventure<\\/option><option value="Food & Drink">\\ud83c\\udf77 Food & Drink<\\/option><option value="Family">\\ud83d\\udc68\\u200d\\ud83d\\udc69\\u200d\\ud83d\\udc67 Family<\\/option><option value="Religious">\\u26ea Religious<\\/option><option value="Conference">\\ud83d\\udccb Conference<\\/option><option value="Other">\\ud83d\\udccc Other<\\/option>';
+  document.getElementById('eg3').innerHTML=evts.map(function(e){
+    var h=vi(e),s=getSrc(e);
+    var selCats=cats.replace('value="'+(e.category||'')+'"','value="'+(e.category||'')+'" selected');
+    return '<div class="ec'+(e.category?' dim':'')+'"><div class="ep">'+(h?'<img src="'+esc(e.image_url)+'" onerror="this.hidden=1">':'<div class="ni">No img<\\/div>')+'<div class="bdg '+(e.category?'ok':'warn')+'">'+(e.category||'No category')+'<\\/div><\\/div><div class="ei"><div class="src">'+s+'<\\/div><div class="ttl">'+esc(e.title)+'<\\/div><div class="mt">'+esc(e.event_date||'No date')+'<\\/div><\\/div><div class="fr"><select id="cat-'+e.id+'" style="flex:1;padding:8px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:white;font-family:inherit;font-size:0.8rem">'+selCats+'<\\/select><button onclick="sc('+e.id+')">Save<\\/button><\\/div><\\/div>';
+  }).join('');
+}
+function sc(id){
+  var v=document.getElementById('cat-'+id).value;
+  if(!v)return toast('Select a category',1);
+  api('PUT','/admin/api/events/'+id+'/category',{category:v},function(){ue(id,'category',v);toast('Category saved \\u2713')});
+}
+function addEvent(){
+  var title=document.getElementById('ae_title').value.trim();
+  var date=document.getElementById('ae_date').value.trim();
+  var loc=document.getElementById('ae_loc').value.trim();
+  var cat=document.getElementById('ae_cat').value;
+  var img=document.getElementById('ae_img').value.trim()||null;
+  var url=document.getElementById('ae_url').value.trim()||null;
+  var desc=document.getElementById('ae_desc').value.trim()||null;
+  if(!title)return toast('Title is required',1);
+  if(!date)return toast('Date is required',1);
+  if(!loc)return toast('Location is required',1);
+  if(!cat)return toast('Category is required',1);
+  api('POST','/admin/api/events',{title:title,event_date:date,location:loc,category:cat,image_url:img,source_url:url,description:desc},function(d){
+    E.push(d.event);us();toast('Event added! \\u2713');
+    ['ae_title','ae_date','ae_loc','ae_img','ae_url','ae_desc'].forEach(function(id){document.getElementById(id).value=''});
+    document.getElementById('ae_cat').value='';
+  });
+}
+function loadAnalytics(){
+  fetch('/admin/api/analytics',{headers:{Authorization:auth}})
+    .then(function(r){return r.json()})
+    .then(function(d){
+      document.getElementById('statCards').innerHTML=
+        '<div class="sc"><div class="num">'+d.total_clicks+'<\\/div><div class="lbl">Total Clicks<\\/div><\\/div>'+
+        '<div class="sc"><div class="num">'+d.today_clicks+'<\\/div><div class="lbl">Today<\\/div><\\/div>'+
+        '<div class="sc"><div class="num">'+d.week_clicks+'<\\/div><div class="lbl">This Week<\\/div><\\/div>'+
+        '<div class="sc"><div class="num">'+d.unique_events+'<\\/div><div class="lbl">Unique Events<\\/div><\\/div>';
+      document.getElementById('clickBody').innerHTML=d.top_events.map(function(e){
+        return '<tr><td>'+e.event_title+'<\\/td><td>'+e.source+'<\\/td><td><strong>'+e.clicks+'<\\/strong><\\/td><\\/tr>';
+      }).join('')||'<tr><td colspan="3" style="color:#64748b">No clicks yet<\\/td><\\/tr>';
+    }).catch(function(){});
+}
+function getSource(e){
+  if(!e.source_url)return 'manual';
+  if(e.source_url.indexOf('showshappening')>-1)return 'showshappening';
+  if(e.source_url.indexOf('visitmalta')>-1)return 'visitmalta';
+  return 'manual';
+}
+function getSrc(e){var s=getSource(e);return s==='showshappening'?'ShowsHappening':s==='visitmalta'?'VisitMalta':'Manual'}
+function ue(id,f,v){var e=E.find(function(x){return x.id===id});if(e)e[f]=v;us();if(tab==='images')af1();else if(tab==='dates')af2();else if(tab==='categories')af3()}
+function api(method,url,body,cb){
+  fetch(url,{method:method,headers:{'Content-Type':'application/json',Authorization:auth},body:JSON.stringify(body)})
+    .then(function(r){if(!r.ok)throw 0;return r.json()}).then(cb).catch(function(){toast('Failed',1)});
+}
+function toast(m,e){var t=document.getElementById('toast');t.textContent=m;t.className='toast show'+(e?' err':'');setTimeout(function(){t.className='toast'},3000)}
+`);
 });
 
 
