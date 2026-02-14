@@ -866,11 +866,20 @@ app.get('/admin', (req, res) => {
 // =====================================================================
 
 // Get all events
-app.get('/admin/api/events', (req, res) => {
+app.get('/admin/api/events', async (req, res) => {
   if (!authCheck(req, res)) return;
-  pool.query('SELECT id, title, source_url, image_url, event_date, location, description, category FROM events ORDER BY title')
-    .then(r => res.json(r.rows))
-    .catch(e => res.status(500).json({ error: e.message }));
+  try {
+    // Try with category column first, fallback without it
+    let result;
+    try {
+      result = await pool.query('SELECT id, title, source_url, image_url, event_date, location, description, category FROM events ORDER BY title');
+    } catch (e) {
+      // category column might not exist yet
+      result = await pool.query('SELECT id, title, source_url, image_url, event_date, location, description FROM events ORDER BY title');
+      result.rows = result.rows.map(r => ({ ...r, category: null }));
+    }
+    res.json(result.rows);
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // Update event image (also saves to overrides for protection)
@@ -927,10 +936,19 @@ app.post('/admin/api/events', async (req, res) => {
   try {
     const { title, event_date, location, image_url, source_url, description, category } = req.body;
     if (!title || !event_date || !location) return res.status(400).json({ error: 'Title, date, and location are required' });
-    const result = await pool.query(
-      'INSERT INTO events (title, event_date, location, image_url, source_url, description, category) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *',
-      [title, event_date, location || 'Malta', image_url || null, source_url || 'manual://added', description || null, category || null]
-    );
+    let result;
+    try {
+      result = await pool.query(
+        'INSERT INTO events (title, event_date, location, image_url, source_url, description, category) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *',
+        [title, event_date, location || 'Malta', image_url || null, source_url || 'manual://added', description || null, category || null]
+      );
+    } catch (e) {
+      // category column might not exist
+      result = await pool.query(
+        'INSERT INTO events (title, event_date, location, image_url, source_url, description) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *',
+        [title, event_date, location || 'Malta', image_url || null, source_url || 'manual://added', description || null]
+      );
+    }
     res.json({ success: true, event: result.rows[0] });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
