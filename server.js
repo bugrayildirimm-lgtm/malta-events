@@ -228,6 +228,17 @@ const createCard = (event, isPast) => {
 // =====================================================================
 app.get('/', async (req, res) => {
   try {
+    // Merge event_overrides (manual images/categories) back into events
+    // This is what makes manual edits survive TRUNCATE + re-scrape
+    try {
+      await pool.query(`
+        UPDATE events e SET 
+          image_url = COALESCE(o.image_url, e.image_url),
+          category = COALESCE(o.category, e.category)
+        FROM event_overrides o WHERE e.source_url = o.source_url
+      `);
+    } catch(e) { /* table may not exist yet, that's ok */ }
+
     const result = await pool.query('SELECT * FROM events');
     const allEvents = result.rows;
     const today = new Date(); today.setHours(0,0,0,0);
@@ -862,20 +873,37 @@ app.get('/admin/api/events', (req, res) => {
     .catch(e => res.status(500).json({ error: e.message }));
 });
 
-// Update event image
-app.put('/admin/api/events/:id/image', (req, res) => {
+// Update event image (also saves to overrides for protection)
+app.put('/admin/api/events/:id/image', async (req, res) => {
   if (!authCheck(req, res)) return;
-  pool.query('UPDATE events SET image_url = $1 WHERE id = $2', [req.body.image_url, req.params.id])
-    .then(() => res.json({ success: true }))
-    .catch(e => res.status(500).json({ error: e.message }));
+  try {
+    await pool.query('UPDATE events SET image_url = $1 WHERE id = $2', [req.body.image_url, req.params.id]);
+    // Save to overrides so it survives truncate
+    const evt = await pool.query('SELECT source_url FROM events WHERE id = $1', [req.params.id]);
+    if (evt.rows[0]) {
+      await pool.query(
+        'INSERT INTO event_overrides (source_url, image_url) VALUES ($1, $2) ON CONFLICT (source_url) DO UPDATE SET image_url = $2',
+        [evt.rows[0].source_url, req.body.image_url]
+      ).catch(()=>{});
+    }
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// Update event category
-app.put('/admin/api/events/:id/category', (req, res) => {
+// Update event category (also saves to overrides)
+app.put('/admin/api/events/:id/category', async (req, res) => {
   if (!authCheck(req, res)) return;
-  pool.query('UPDATE events SET category = $1 WHERE id = $2', [req.body.category, req.params.id])
-    .then(() => res.json({ success: true }))
-    .catch(e => res.status(500).json({ error: e.message }));
+  try {
+    await pool.query('UPDATE events SET category = $1 WHERE id = $2', [req.body.category, req.params.id]);
+    const evt = await pool.query('SELECT source_url FROM events WHERE id = $1', [req.params.id]);
+    if (evt.rows[0]) {
+      await pool.query(
+        'INSERT INTO event_overrides (source_url, category) VALUES ($1, $2) ON CONFLICT (source_url) DO UPDATE SET category = $2',
+        [evt.rows[0].source_url, req.body.category]
+      ).catch(()=>{});
+    }
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // Update event date
