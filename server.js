@@ -168,9 +168,10 @@ function badge(top, bottom) {
 // CARD BUILDER
 // =====================================================================
 const createCard = (event, isPast) => {
-    let source = 'Manual';
+    let source = 'Other';
     if (event.source_url && event.source_url.includes('showshappening')) source = 'ShowsHappening';
     else if (event.source_url && event.source_url.includes('visitmalta')) source = 'VisitMalta';
+    else if (event.source_url && event.source_url.includes('eventbrite')) source = 'Eventbrite';
 
     let title = event.title || '';
     if (looksLikeDate(title) || title.startsWith('Price:') || title.includes('€')) {
@@ -666,7 +667,8 @@ app.get('/admin', (req, res) => {
         <div class="form-group"><label>Location <span class="req">*</span></label><input type="text" id="ae_loc" placeholder="e.g. Mediterranean Conference Centre, Valletta"></div>
         <div class="form-group"><label>Category <span class="req">*</span></label><select id="ae_cat" style="width:100%;padding:10px 14px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:white;font-family:inherit;font-size:0.9rem"><option value="">Select category...</option><option value="Music & Concerts">🎵 Music & Concerts</option><option value="Theatre & Shows">🎭 Theatre & Shows</option><option value="Dance">💃 Dance</option><option value="Nightlife & Parties">🎉 Nightlife & Parties</option><option value="Festivals">🎪 Festivals</option><option value="Arts & Culture">🎨 Arts & Culture</option><option value="Sports & Adventure">🏃 Sports & Adventure</option><option value="Food & Drink">🍷 Food & Drink</option><option value="Family">👨‍👩‍👧 Family</option><option value="Religious">⛪ Religious</option><option value="Conference">📋 Conference</option><option value="Other">📌 Other</option></select></div>
         <div class="form-group"><label>Image URL</label><input type="text" id="ae_img" placeholder="https://..."><div class="hint">Paste a direct link to the event image (right-click image → Copy image address)</div></div>
-        <div class="form-group"><label>Event/Ticket URL</label><input type="text" id="ae_url" placeholder="https://... link to event page or ticket sales"></div>
+        <div class="form-group"><label>Source <span class="req">*</span></label><select id="ae_source" style="width:100%;padding:10px 14px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:white;font-family:inherit;font-size:0.9rem"><option value="">Select source...</option><option value="showshappening">ShowsHappening</option><option value="visitmalta">VisitMalta</option><option value="eventbrite">Eventbrite</option><option value="other">Other</option></select><div class="hint">Where did you find this event?</div></div>
+        <div class="form-group"><label>Event/Ticket URL <span class="req">*</span></label><input type="text" id="ae_url" placeholder="https://... link to event page or ticket sales"><div class="hint">The link users will go to when they click Details</div></div>
         <div class="form-group"><label>Description</label><textarea id="ae_desc" placeholder="Brief description of the event..."></textarea></div>
         <button class="form-btn" onclick="addEvent()">Add Event</button>
       </div>
@@ -750,7 +752,7 @@ function af1(){
 function ri(evts){
   document.getElementById('eg1').innerHTML=evts.map(function(e){
     var h=vi(e),s=getSrc(e);
-    return '<div class="ec'+(h?' dim':'')+'"><div class="ep">'+(h?'<img src="'+esc(e.image_url)+'" onerror="this.hidden=1">':'<div class="ni">No image<\\/div>')+'<div class="bdg '+(h?'ok':'miss')+'">'+(h?'\\u2713':'\\u2717')+'<\\/div><\\/div><div class="ei"><div class="src">'+s+'<\\/div><div class="ttl">'+esc(e.title)+'<\\/div><div class="mt">'+esc(e.event_date||'No date')+' \\u00b7 <a href="'+esc(e.source_url)+'" target="_blank">View \\u2197<\\/a><\\/div><\\/div><div class="fr"><input id="img-'+e.id+'" placeholder="Paste image URL..." value="'+esc(h?e.image_url:'')+'"><button onclick="si('+e.id+')">Save<\\/button><\\/div>'+(h?'<div class="fa"><button class="del" onclick="rmi('+e.id+')">Remove<\\/button><\\/div>':'')+'<\\/div>';
+    return '<div class="ec'+(h?' dim':'')+'"><div class="ep">'+(h?'<img src="'+esc(e.image_url)+'" onerror="this.hidden=1">':'<div class="ni">No image<\\/div>')+'<div class="bdg '+(h?'ok':'miss')+'">'+(h?'\\u2713':'\\u2717')+'<\\/div><\\/div><div class="ei"><div class="src">'+s+'<\\/div><div class="ttl">'+esc(e.title)+'<\\/div><div class="mt">'+esc(e.event_date||'No date')+' \\u00b7 <a href="'+esc(e.source_url)+'" target="_blank">View \\u2197<\\/a><\\/div><\\/div><div class="fr"><input id="img-'+e.id+'" placeholder="Paste image URL..." value="'+esc(h?e.image_url:'')+'"><button onclick="si('+e.id+')">Save<\\/button><\\/div>'+'<div class="fa">'+(h?'<button class="del" onclick="rmi('+e.id+')">Remove img<\\/button>':'')+'<button class="del" onclick="delEvt('+e.id+')">❌ Delete event<\\/button><\\/div><\\/div>';
   }).join('');
 }
 function si(id){
@@ -775,7 +777,7 @@ function af2(){
 function rd(evts){
   document.getElementById('eg2').innerHTML=evts.map(function(e){
     var hd=!!e.event_date,h=vi(e),s=getSrc(e);
-    return '<div class="ec'+(hd?' dim':'')+'"><div class="ep">'+(h?'<img src="'+esc(e.image_url)+'" onerror="this.hidden=1">':'<div class="ni">No img<\\/div>')+'<div class="bdg '+(hd?'ok':'warn')+'">'+(hd?'\\u2713 '+esc(e.event_date):'\\u2717 No date')+'<\\/div><\\/div><div class="ei"><div class="src">'+s+'<\\/div><div class="ttl">'+esc(e.title)+'<\\/div><div class="mt"><a href="'+esc(e.source_url||'#')+'" target="_blank">View event \\u2197<\\/a><\\/div><\\/div><div class="fr"><input id="dt-'+e.id+'" placeholder="e.g. 14 Feb or 20,21 Mar" value="'+esc(e.event_date||'')+'"><button onclick="sd('+e.id+')">Save<\\/button><\\/div><div class="dh"><div class="dh-t">Quick formats:<\\/div><div class="dc"><span class="chip" onclick="sdv('+e.id+',\\x2714 Feb\\x27)">14 Feb<\\/span><span class="chip" onclick="sdv('+e.id+',\\x2720,21 Mar\\x27)">20,21 Mar<\\/span><span class="chip" onclick="sdv('+e.id+',\\x27Feb to May\\x27)">Feb to May<\\/span><span class="chip" onclick="sdv('+e.id+',\\x2714 Feb to 28 Mar\\x27)">14 Feb to 28 Mar<\\/span><\\/div><\\/div>'+(hd?'<div class="fa"><button class="del" onclick="rmd('+e.id+')">Clear<\\/button><\\/div>':'')+'<\\/div>';
+    return '<div class="ec'+(hd?' dim':'')+'"><div class="ep">'+(h?'<img src="'+esc(e.image_url)+'" onerror="this.hidden=1">':'<div class="ni">No img<\\/div>')+'<div class="bdg '+(hd?'ok':'warn')+'">'+(hd?'\\u2713 '+esc(e.event_date):'\\u2717 No date')+'<\\/div><\\/div><div class="ei"><div class="src">'+s+'<\\/div><div class="ttl">'+esc(e.title)+'<\\/div><div class="mt"><a href="'+esc(e.source_url||'#')+'" target="_blank">View event \\u2197<\\/a><\\/div><\\/div><div class="fr"><input id="dt-'+e.id+'" placeholder="e.g. 14 Feb or 20,21 Mar" value="'+esc(e.event_date||'')+'"><button onclick="sd('+e.id+')">Save<\\/button><\\/div><div class="dh"><div class="dh-t">Quick formats:<\\/div><div class="dc"><span class="chip" onclick="sdv('+e.id+',\\x2714 Feb\\x27)">14 Feb<\\/span><span class="chip" onclick="sdv('+e.id+',\\x2720,21 Mar\\x27)">20,21 Mar<\\/span><span class="chip" onclick="sdv('+e.id+',\\x27Feb to May\\x27)">Feb to May<\\/span><span class="chip" onclick="sdv('+e.id+',\\x2714 Feb to 28 Mar\\x27)">14 Feb to 28 Mar<\\/span><\\/div><\\/div>'+'<div class="fa">'+(hd?'<button class="del" onclick="rmd('+e.id+')">Clear date<\\/button>':'')+'<button class="del" onclick="delEvt('+e.id+')">❌ Delete event<\\/button><\\/div><\\/div>';
   }).join('');
 }
 function sdv(id,v){document.getElementById('dt-'+id).value=v;document.getElementById('dt-'+id).focus()}
@@ -806,7 +808,7 @@ function rc(evts){
   document.getElementById('eg3').innerHTML=evts.map(function(e){
     var h=vi(e),s=getSrc(e);
     var selCats=cats.replace('value="'+(e.category||'')+'"','value="'+(e.category||'')+'" selected');
-    return '<div class="ec'+(e.category?' dim':'')+'"><div class="ep">'+(h?'<img src="'+esc(e.image_url)+'" onerror="this.hidden=1">':'<div class="ni">No img<\\/div>')+'<div class="bdg '+(e.category?'ok':'warn')+'">'+(e.category||'No category')+'<\\/div><\\/div><div class="ei"><div class="src">'+s+'<\\/div><div class="ttl">'+esc(e.title)+'<\\/div><div class="mt">'+esc(e.event_date||'No date')+'<\\/div><\\/div><div class="fr"><select id="cat-'+e.id+'" style="flex:1;padding:8px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:white;font-family:inherit;font-size:0.8rem">'+selCats+'<\\/select><button onclick="sc('+e.id+')">Save<\\/button><\\/div><\\/div>';
+    return '<div class="ec'+(e.category?' dim':'')+'"><div class="ep">'+(h?'<img src="'+esc(e.image_url)+'" onerror="this.hidden=1">':'<div class="ni">No img<\\/div>')+'<div class="bdg '+(e.category?'ok':'warn')+'">'+(e.category||'No category')+'<\\/div><\\/div><div class="ei"><div class="src">'+s+'<\\/div><div class="ttl">'+esc(e.title)+'<\\/div><div class="mt">'+esc(e.event_date||'No date')+'<\\/div><\\/div><div class="fr"><select id="cat-'+e.id+'" style="flex:1;padding:8px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:white;font-family:inherit;font-size:0.8rem">'+selCats+'<\\/select><button onclick="sc('+e.id+')">Save<\\/button><\\/div><div class="fa"><button class="del" onclick="delEvt('+e.id+')">❌ Delete event<\\/button><\\/div><\\/div>';
   }).join('');
 }
 function sc(id){
@@ -820,16 +822,23 @@ function addEvent(){
   var loc=document.getElementById('ae_loc').value.trim();
   var cat=document.getElementById('ae_cat').value;
   var img=document.getElementById('ae_img').value.trim()||null;
+  var src=document.getElementById('ae_source').value;
   var url=document.getElementById('ae_url').value.trim()||null;
+  if(!src)return toast('Source is required',1);
+  if(!url)return toast('Event URL is required',1);
   var desc=document.getElementById('ae_desc').value.trim()||null;
   if(!title)return toast('Title is required',1);
   if(!date)return toast('Date is required',1);
   if(!loc)return toast('Location is required',1);
   if(!cat)return toast('Category is required',1);
-  api('POST','/admin/api/events',{title:title,event_date:date,location:loc,category:cat,image_url:img,source_url:url,description:desc},function(d){
+  var sourceUrl=url;
+  if(src==='showshappening'&&url.indexOf('showshappening')<0)sourceUrl='https://www.showshappening.com/ref/'+encodeURIComponent(url);
+  if(src==='visitmalta'&&url.indexOf('visitmalta')<0)sourceUrl='https://www.visitmalta.com/ref/'+encodeURIComponent(url);
+  api('POST','/admin/api/events',{title:title,event_date:date,location:loc,category:cat,image_url:img,source_url:sourceUrl,description:desc},function(d){
     E.push(d.event);us();toast('Event added! \\u2713');
     ['ae_title','ae_date','ae_loc','ae_img','ae_url','ae_desc'].forEach(function(id){document.getElementById(id).value=''});
     document.getElementById('ae_cat').value='';
+    document.getElementById('ae_source').value='';
   });
 }
 function loadAnalytics(){
@@ -845,6 +854,15 @@ function loadAnalytics(){
         return '<tr><td>'+e.event_title+'<\\/td><td>'+e.source+'<\\/td><td><strong>'+e.clicks+'<\\/strong><\\/td><\\/tr>';
       }).join('')||'<tr><td colspan="3" style="color:#64748b">No clicks yet<\\/td><\\/tr>';
     }).catch(function(){});
+}
+function delEvt(id){
+  if(!confirm('Delete this event permanently?'))return;
+  api('DELETE','/admin/api/events/'+id,{},function(){
+    E=E.filter(function(x){return x.id!==id});
+    us();
+    if(tab==='images')af1();else if(tab==='dates')af2();else if(tab==='categories')af3();
+    toast('Event deleted');
+  });
 }
 function getSource(e){
   if(!e.source_url)return 'manual';
@@ -913,6 +931,15 @@ app.put('/admin/api/events/:id/category', async (req, res) => {
         [evt.rows[0].source_url, req.body.category]
       ).catch(()=>{});
     }
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Delete event
+app.delete('/admin/api/events/:id', async (req, res) => {
+  if (!authCheck(req, res)) return;
+  try {
+    await pool.query('DELETE FROM events WHERE id = $1', [req.params.id]);
     res.json({ success: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
