@@ -336,24 +336,28 @@ app.get('/', async (req, res) => {
   <meta charset="UTF-8">
   <title>Malta Events 2026 | Concerts, Festivals, Nightlife & Things to Do in Malta</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Discover the best events in Malta and Gozo. Browse concerts, festivals, theatre, nightlife, sports and cultural events. Your complete guide to what's on in Malta.">
-  <meta name="keywords" content="Malta events, things to do in Malta, Malta concerts, Malta festivals, Malta nightlife, Gozo events, what's on Malta, Malta 2026, Malta carnival, Malta theatre, events in Valletta">
+  <meta name="description" content="Discover the best events happening in Malta and Gozo. Browse concerts, festivals, theatre shows, nightlife parties, sports, food events and cultural activities across the Maltese islands. Updated daily.">
+  <meta name="keywords" content="Malta events, things to do in Malta, Malta concerts, Malta festivals, Malta nightlife, Gozo events, what's on Malta, Malta 2026, Malta carnival, Malta theatre, events in Valletta, Malta parties, Malta sports">
   <meta name="author" content="Malta Event Guide">
   <meta name="robots" content="index, follow">
   <link rel="canonical" href="https://maltaeventguide.com/">
 
   <!-- Open Graph (Facebook, WhatsApp, LinkedIn) -->
   <meta property="og:type" content="website">
-  <meta property="og:title" content="Malta Event Guide | What's On in Malta & Gozo">
-  <meta property="og:description" content="Discover concerts, festivals, nightlife, theatre and more. The complete guide to events in Malta.">
+  <meta property="og:title" content="Malta Event Guide | Concerts, Festivals, Nightlife & Things to Do in Malta & Gozo">
+  <meta property="og:description" content="Your complete guide to what's on in Malta. Discover concerts, festivals, theatre, nightlife, sports and cultural events happening across the Maltese islands. Updated daily with the latest listings.">
   <meta property="og:url" content="https://maltaeventguide.com/">
   <meta property="og:site_name" content="Malta Event Guide">
   <meta property="og:locale" content="en_MT">
+  <meta property="og:image" content="https://images.pexels.com/photos/34699762/pexels-photo-34699762.jpeg?auto=compress&cs=tinysrgb&w=1200&h=630">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
 
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Malta Event Guide | What's On in Malta & Gozo">
-  <meta name="twitter:description" content="Discover concerts, festivals, nightlife, theatre and more. The complete guide to events in Malta.">
+  <meta name="twitter:title" content="Malta Event Guide | Concerts, Festivals, Nightlife & Things to Do in Malta & Gozo">
+  <meta name="twitter:description" content="Your complete guide to what's on in Malta. Discover concerts, festivals, theatre, nightlife, sports and cultural events. Updated daily with the latest listings.">
+  <meta name="twitter:image" content="https://images.pexels.com/photos/34699762/pexels-photo-34699762.jpeg?auto=compress&cs=tinysrgb&w=1200&h=630">
 
   <!-- JSON-LD Structured Data -->
   <script type="application/ld+json">
@@ -558,6 +562,7 @@ app.get('/', async (req, res) => {
       <h2 style="color:white;font-size:1.2rem;margin:0 0 10px">Malta Event Guide</h2>
       <p>Your complete guide to events in Malta and Gozo. Discover concerts, festivals, theatre, nightlife, sports, arts and cultural events happening across the Maltese islands.</p>
       <p style="margin-top:15px;font-size:0.75rem;color:#64748b">&copy; ${new Date().getFullYear()} maltaeventguide.com &middot; Events sourced from ShowsHappening, VisitMalta and local organizers</p>
+      <p style="margin-top:8px;font-size:0.75rem;color:#64748b">Powered by <a href="https://bugrayildirim.me/" target="_blank" style="color:#94a3b8;text-decoration:underline">Bugra</a> &middot; <a href="mailto:hello@bugrayildirim.me" style="color:#94a3b8;text-decoration:underline">hello@bugrayildirim.me</a></p>
     </div>
   </footer>
 </body>
