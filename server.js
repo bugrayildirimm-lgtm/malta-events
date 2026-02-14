@@ -261,14 +261,34 @@ app.get('/', async (req, res) => {
         const endDate = getEndDate(event.event_date);
         const startDate = getStartDate(event.event_date);
         if (!endDate || endDate >= today) {
-          upcoming.push({ ...event, _sort: startDate });
+          // For sorting upcoming: use start date, but if start is in the past
+          // (ongoing event), treat it as "happening now" (sort near top)
+          let sortDate = startDate;
+          if (startDate && startDate < today) {
+            // Ongoing event — sort by today so it appears at the top
+            sortDate = new Date(today);
+          }
+          upcoming.push({ ...event, _sort: sortDate });
         } else {
-          past.push({ ...event, _sort: startDate });
+          past.push({ ...event, _sort: endDate });
         }
     });
 
-    upcoming.sort((a,b) => (a._sort||new Date('2099-01-01')) - (b._sort||new Date('2099-01-01')));
-    past.sort((a,b) => (b._sort||0) - (a._sort||0));
+    // Upcoming: soonest first, no-date events at the end
+    upcoming.sort((a,b) => {
+      if (!a._sort && !b._sort) return 0;
+      if (!a._sort) return 1;  // no date → end
+      if (!b._sort) return -1; // no date → end
+      return a._sort - b._sort;
+    });
+
+    // Past: most recently ended first
+    past.sort((a,b) => {
+      if (!a._sort && !b._sort) return 0;
+      if (!a._sort) return 1;
+      if (!b._sort) return -1;
+      return b._sort - a._sort;
+    });
 
     const html = `<!DOCTYPE html>
 <html lang="en">
