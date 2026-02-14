@@ -392,11 +392,10 @@ app.get('/', async (req, res) => {
 });
 
 // =====================================================================
-// ADMIN PAGE - Manage event images
+// ADMIN PAGE - Manage event images & dates
 // =====================================================================
 app.use(express.json());
 
-// Simple auth - change this password!
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'malta2026';
 
 app.get('/admin', (req, res) => {
@@ -423,18 +422,25 @@ app.get('/admin', (req, res) => {
     .admin-header .stats { color: #94a3b8; font-size: 0.9rem; }
     .admin-header a { color: #FF385C; text-decoration: none; font-weight: 600; }
     
+    .tabs { display: flex; background: #1e293b; border-bottom: 1px solid #334155; padding: 0 30px; }
+    .tab { padding: 14px 24px; cursor: pointer; color: #64748b; font-weight: 600; font-size: 0.95rem; border-bottom: 3px solid transparent; transition: 0.2s; }
+    .tab:hover { color: #e2e8f0; }
+    .tab.active { color: #FF385C; border-bottom-color: #FF385C; }
+    .tab .tab-count { background: #334155; color: #94a3b8; padding: 2px 8px; border-radius: 10px; font-size: 0.75rem; margin-left: 6px; }
+    .tab.active .tab-count { background: #FF385C; color: white; }
+    
     .filters { background: #1e293b; padding: 15px 30px; display: flex; gap: 10px; align-items: center; border-bottom: 1px solid #334155; flex-wrap: wrap; }
     .filters input, .filters select { padding: 8px 14px; border-radius: 8px; border: 1px solid #334155; background: #0f172a; color: white; font-family: inherit; font-size: 0.9rem; }
     .filters input { flex: 1; min-width: 200px; }
     .filter-btn { padding: 8px 16px; border-radius: 8px; border: 1px solid #334155; background: transparent; color: #94a3b8; cursor: pointer; font-family: inherit; font-size: 0.85rem; transition: 0.2s; }
     .filter-btn:hover, .filter-btn.active { background: #FF385C; color: white; border-color: #FF385C; }
     
-    .events-grid { padding: 20px 30px; display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 20px; }
+    .events-grid { padding: 20px 30px; display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 20px; }
     
     .event-card { background: #1e293b; border-radius: 12px; overflow: hidden; border: 1px solid #334155; transition: 0.2s; }
     .event-card:hover { border-color: #475569; }
-    .event-card.has-image { opacity: 0.6; }
-    .event-card.has-image:hover { opacity: 1; }
+    .event-card.dimmed { opacity: 0.5; }
+    .event-card.dimmed:hover { opacity: 1; }
     
     .event-preview { height: 140px; position: relative; background: #334155; overflow: hidden; display: flex; align-items: center; justify-content: center; }
     .event-preview img { width: 100%; height: 100%; object-fit: cover; }
@@ -442,23 +448,30 @@ app.get('/admin', (req, res) => {
     .event-preview .badge { position: absolute; top: 8px; right: 8px; padding: 3px 10px; border-radius: 20px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; }
     .badge.missing { background: #ef4444; color: white; }
     .badge.has { background: #22c55e; color: white; }
+    .badge.warn { background: #f59e0b; color: #0f172a; }
     
     .event-info { padding: 15px; }
     .event-info .source { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; color: #64748b; margin-bottom: 5px; }
     .event-info .title { font-size: 1rem; font-weight: 700; margin-bottom: 5px; color: #f1f5f9; line-height: 1.3; }
-    .event-info .date { font-size: 0.8rem; color: #94a3b8; margin-bottom: 10px; }
+    .event-info .meta { font-size: 0.8rem; color: #94a3b8; margin-bottom: 10px; }
+    .event-info .meta a { color: #FF385C; }
     
-    .image-input { display: flex; gap: 8px; padding: 0 15px 15px; }
-    .image-input input { flex: 1; padding: 8px 12px; border-radius: 8px; border: 1px solid #334155; background: #0f172a; color: white; font-size: 0.85rem; font-family: inherit; }
-    .image-input input:focus { outline: none; border-color: #FF385C; }
-    .image-input button { padding: 8px 16px; border-radius: 8px; border: none; background: #FF385C; color: white; font-weight: 700; cursor: pointer; font-size: 0.85rem; font-family: inherit; white-space: nowrap; }
-    .image-input button:hover { background: #e11d48; }
-    .image-input button:disabled { background: #334155; cursor: not-allowed; }
+    .field-row { display: flex; gap: 8px; padding: 0 15px 10px; align-items: center; }
+    .field-row input { flex: 1; padding: 8px 12px; border-radius: 8px; border: 1px solid #334155; background: #0f172a; color: white; font-size: 0.85rem; font-family: inherit; }
+    .field-row input:focus { outline: none; border-color: #FF385C; }
+    .field-row button { padding: 8px 16px; border-radius: 8px; border: none; background: #FF385C; color: white; font-weight: 700; cursor: pointer; font-size: 0.85rem; font-family: inherit; white-space: nowrap; }
+    .field-row button:hover { background: #e11d48; }
     
-    .image-actions { padding: 0 15px 15px; display: flex; gap: 8px; }
-    .image-actions button { padding: 6px 12px; border-radius: 6px; border: 1px solid #334155; background: transparent; color: #94a3b8; cursor: pointer; font-size: 0.75rem; font-family: inherit; }
-    .image-actions button:hover { background: #334155; color: white; }
-    .image-actions .delete-btn:hover { background: #ef4444; border-color: #ef4444; color: white; }
+    .field-actions { padding: 0 15px 15px; display: flex; gap: 8px; flex-wrap: wrap; }
+    .field-actions button { padding: 5px 10px; border-radius: 6px; border: 1px solid #334155; background: transparent; color: #94a3b8; cursor: pointer; font-size: 0.7rem; font-family: inherit; }
+    .field-actions button:hover { background: #334155; color: white; }
+    .field-actions .delete-btn:hover { background: #ef4444; border-color: #ef4444; color: white; }
+    
+    .date-help { padding: 0 15px 12px; }
+    .date-help-title { font-size: 0.75rem; color: #64748b; margin-bottom: 6px; }
+    .date-chips { display: flex; gap: 5px; flex-wrap: wrap; }
+    .date-chip { padding: 3px 8px; border-radius: 5px; font-size: 0.7rem; background: #0f172a; border: 1px solid #334155; color: #94a3b8; cursor: pointer; transition: 0.2s; }
+    .date-chip:hover { border-color: #FF385C; color: #FF385C; }
     
     .toast { position: fixed; bottom: 30px; right: 30px; background: #22c55e; color: white; padding: 12px 24px; border-radius: 10px; font-weight: 600; display: none; z-index: 1000; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
     .toast.error { background: #ef4444; }
@@ -467,6 +480,15 @@ app.get('/admin', (req, res) => {
     
     .count-bar { padding: 10px 30px; background: #1e293b; border-bottom: 1px solid #334155; font-size: 0.85rem; color: #94a3b8; }
     .count-bar span { color: #FF385C; font-weight: 700; }
+    
+    .format-guide { background: #1e293b; padding: 15px 30px; border-bottom: 1px solid #334155; display: none; }
+    .format-guide h3 { font-size: 0.9rem; color: #e2e8f0; margin-bottom: 10px; }
+    .format-table { width: 100%; font-size: 0.8rem; }
+    .format-table td { padding: 5px 15px 5px 0; color: #94a3b8; border-bottom: 1px solid #1e293b; }
+    .format-table td:first-child { color: #22c55e; font-family: monospace; font-weight: 600; white-space: nowrap; }
+    .format-table td:last-child { color: #64748b; }
+    .format-toggle { color: #FF385C; cursor: pointer; font-size: 0.8rem; font-weight: 600; padding: 8px 30px; background: #1e293b; border-bottom: 1px solid #334155; }
+    .format-toggle:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -481,33 +503,70 @@ app.get('/admin', (req, res) => {
   <div class="admin-panel" id="adminPanel">
     <div class="admin-header">
       <div>
-        <h1>🎛️ Event Image Manager</h1>
+        <h1>🎛️ Event Manager</h1>
         <div class="stats" id="statsText">Loading...</div>
       </div>
       <a href="/">← Back to site</a>
     </div>
     
-    <div class="filters">
-      <input type="text" id="searchFilter" placeholder="🔍 Search events..." oninput="applyFilters()">
-      <select id="sourceFilter" onchange="applyFilters()">
-        <option value="all">All sources</option>
-        <option value="showshappening">ShowsHappening</option>
-        <option value="visitmalta">VisitMalta</option>
-      </select>
-      <button class="filter-btn active" onclick="setImageFilter('missing', this)">Missing images</button>
-      <button class="filter-btn" onclick="setImageFilter('has', this)">Has images</button>
-      <button class="filter-btn" onclick="setImageFilter('all', this)">All events</button>
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('images', this)">🖼️ Images <span class="tab-count" id="imgCount">0</span></div>
+      <div class="tab" onclick="switchTab('dates', this)">📅 Dates <span class="tab-count" id="dateCount">0</span></div>
     </div>
-    
-    <div class="count-bar" id="countBar">Loading events...</div>
-    <div class="events-grid" id="eventsGrid"></div>
+
+    <div id="imagesTab">
+      <div class="filters">
+        <input type="text" id="searchFilter" placeholder="🔍 Search events..." oninput="applyFilters()">
+        <select id="sourceFilter" onchange="applyFilters()">
+          <option value="all">All sources</option>
+          <option value="showshappening">ShowsHappening</option>
+          <option value="visitmalta">VisitMalta</option>
+        </select>
+        <button class="filter-btn active" onclick="setSubFilter('missing', this)">Missing images</button>
+        <button class="filter-btn" onclick="setSubFilter('has', this)">Has images</button>
+        <button class="filter-btn" onclick="setSubFilter('all', this)">All events</button>
+      </div>
+      <div class="count-bar" id="countBar">Loading...</div>
+      <div class="events-grid" id="eventsGrid"></div>
+    </div>
+
+    <div id="datesTab" style="display:none;">
+      <div class="format-toggle" onclick="toggleGuide()">📖 Show date format guide</div>
+      <div class="format-guide" id="formatGuide">
+        <h3>Supported date formats</h3>
+        <table class="format-table">
+          <tr><td>14 Feb</td><td>Single date</td><td>One day event</td></tr>
+          <tr><td>20,21 Feb</td><td>Multiple days, same month</td><td>Comma-separated days</td></tr>
+          <tr><td>13,14,15 Mar</td><td>Multiple days, same month</td><td>Multi-day event</td></tr>
+          <tr><td>14 Feb to 28 Mar</td><td>Date range</td><td>Start to end with different months</td></tr>
+          <tr><td>Feb to May</td><td>Month range</td><td>Ongoing, months only</td></tr>
+          <tr><td>14-Feb to 28-Mar</td><td>Date range (dash style)</td><td>Also works</td></tr>
+          <tr><td>5 February 2026 - 1 March 2026</td><td>Full date range</td><td>VisitMalta style</td></tr>
+        </table>
+      </div>
+      <div class="filters">
+        <input type="text" id="dateSearchFilter" placeholder="🔍 Search events..." oninput="applyDateFilters()">
+        <select id="dateSourceFilter" onchange="applyDateFilters()">
+          <option value="all">All sources</option>
+          <option value="showshappening">ShowsHappening</option>
+          <option value="visitmalta">VisitMalta</option>
+        </select>
+        <button class="filter-btn active" onclick="setDateSubFilter('missing', this)">Missing dates</button>
+        <button class="filter-btn" onclick="setDateSubFilter('has', this)">Has dates</button>
+        <button class="filter-btn" onclick="setDateSubFilter('all', this)">All events</button>
+      </div>
+      <div class="count-bar" id="dateCountBar">Loading...</div>
+      <div class="events-grid" id="datesGrid"></div>
+    </div>
   </div>
 
   <div class="toast" id="toast"></div>
 
   <script>
     let allEvents = [];
-    let imageFilter = 'missing';
+    let currentTab = 'images';
+    let subFilter = 'missing';
+    let dateSubFilter = 'missing';
     let authToken = '';
 
     function doLogin() {
@@ -520,23 +579,41 @@ app.get('/admin', (req, res) => {
           document.getElementById('adminPanel').style.display = 'block';
           updateStats();
           applyFilters();
+          applyDateFilters();
         })
         .catch(() => showToast('Wrong password!', true));
     }
 
     function updateStats() {
-      const missing = allEvents.filter(e => !hasValidImage(e)).length;
+      const missingImg = allEvents.filter(e => !hasValidImage(e)).length;
+      const missingDate = allEvents.filter(e => !e.event_date).length;
       const total = allEvents.length;
-      document.getElementById('statsText').textContent = total + ' total events · ' + missing + ' missing images';
+      document.getElementById('statsText').textContent = total + ' events · ' + missingImg + ' missing images · ' + missingDate + ' missing dates';
+      document.getElementById('imgCount').textContent = missingImg;
+      document.getElementById('dateCount').textContent = missingDate;
     }
 
     function hasValidImage(e) {
       return e.image_url && !e.image_url.includes('/api/v2/file/') && e.image_url.startsWith('http');
     }
 
-    function setImageFilter(filter, btn) {
-      imageFilter = filter;
-      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    function switchTab(tab, el) {
+      currentTab = tab;
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      el.classList.add('active');
+      document.getElementById('imagesTab').style.display = tab === 'images' ? '' : 'none';
+      document.getElementById('datesTab').style.display = tab === 'dates' ? '' : 'none';
+    }
+
+    function toggleGuide() {
+      const g = document.getElementById('formatGuide');
+      g.style.display = g.style.display === 'none' ? '' : 'none';
+    }
+
+    // === IMAGES TAB ===
+    function setSubFilter(filter, btn) {
+      subFilter = filter;
+      document.querySelectorAll('#imagesTab .filter-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       applyFilters();
     }
@@ -544,82 +621,164 @@ app.get('/admin', (req, res) => {
     function applyFilters() {
       const search = document.getElementById('searchFilter').value.toLowerCase();
       const source = document.getElementById('sourceFilter').value;
-      
       let filtered = allEvents.filter(e => {
-        if (search && !e.title.toLowerCase().includes(search) && !(e.event_date||'').toLowerCase().includes(search)) return false;
+        if (search && !e.title.toLowerCase().includes(search)) return false;
         if (source !== 'all' && !e.source_url.includes(source)) return false;
-        if (imageFilter === 'missing' && hasValidImage(e)) return false;
-        if (imageFilter === 'has' && !hasValidImage(e)) return false;
+        if (subFilter === 'missing' && hasValidImage(e)) return false;
+        if (subFilter === 'has' && !hasValidImage(e)) return false;
         return true;
       });
-
       document.getElementById('countBar').innerHTML = 'Showing <span>' + filtered.length + '</span> events';
-      renderEvents(filtered);
+      renderImageCards(filtered);
     }
 
-    function renderEvents(events) {
+    function renderImageCards(events) {
       const grid = document.getElementById('eventsGrid');
       grid.innerHTML = events.map(e => {
         const hasImg = hasValidImage(e);
-        const source = e.source_url.includes('showshappening') ? 'ShowsHappening' : 
-                       e.source_url.includes('visitmalta') ? 'VisitMalta' : 'Unknown';
-        return '<div class="event-card ' + (hasImg ? 'has-image' : '') + '" data-id="' + e.id + '">' +
+        const source = e.source_url.includes('showshappening') ? 'ShowsHappening' : e.source_url.includes('visitmalta') ? 'VisitMalta' : 'Unknown';
+        return '<div class="event-card ' + (hasImg ? 'dimmed' : '') + '">' +
           '<div class="event-preview">' +
-            (hasImg ? '<img src="' + e.image_url + '" onerror="this.parentElement.innerHTML=\\'<div class=no-img>Image broken</div>\\';">' : '<div class="no-img">No image</div>') +
-            '<div class="badge ' + (hasImg ? 'has' : 'missing') + '">' + (hasImg ? '✓ Has image' : '✗ No image') + '</div>' +
+            (hasImg ? '<img src="' + e.image_url + '" onerror="this.parentElement.innerHTML=\\'<div class=no-img>Broken</div>\\';">' : '<div class="no-img">No image</div>') +
+            '<div class="badge ' + (hasImg ? 'has' : 'missing') + '">' + (hasImg ? '✓ Image' : '✗ No image') + '</div>' +
           '</div>' +
           '<div class="event-info">' +
             '<div class="source">' + source + '</div>' +
             '<div class="title">' + e.title + '</div>' +
-            '<div class="date">' + (e.event_date || 'No date') + ' · <a href="' + e.source_url + '" target="_blank" style="color:#FF385C;">View event ↗</a></div>' +
+            '<div class="meta">' + (e.event_date || 'No date') + ' · <a href="' + e.source_url + '" target="_blank">View ↗</a></div>' +
           '</div>' +
-          '<div class="image-input">' +
+          '<div class="field-row">' +
             '<input type="text" id="img-' + e.id + '" placeholder="Paste image URL..." value="' + (hasImg ? e.image_url : '') + '">' +
             '<button onclick="saveImage(' + e.id + ')">Save</button>' +
           '</div>' +
-          (hasImg ? '<div class="image-actions"><button class="delete-btn" onclick="removeImage(' + e.id + ')">Remove image</button></div>' : '') +
+          (hasImg ? '<div class="field-actions"><button class="delete-btn" onclick="removeImage(' + e.id + ')">Remove image</button></div>' : '') +
         '</div>';
       }).join('');
     }
 
     function saveImage(id) {
-      const input = document.getElementById('img-' + id);
-      const url = input.value.trim();
-      if (!url) return showToast('Please paste an image URL first', true);
-      if (!url.startsWith('http')) return showToast('URL must start with http', true);
-
+      const url = document.getElementById('img-' + id).value.trim();
+      if (!url || !url.startsWith('http')) return showToast('Enter a valid image URL', true);
       fetch('/admin/api/events/' + id + '/image', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'Authorization': authToken },
         body: JSON.stringify({ image_url: url })
       })
-      .then(r => { if (!r.ok) throw new Error('Failed'); return r.json(); })
-      .then(() => {
-        const evt = allEvents.find(e => e.id === id);
-        if (evt) evt.image_url = url;
-        updateStats();
-        applyFilters();
-        showToast('Image saved! ✓');
-      })
+      .then(r => { if (!r.ok) throw new Error(); return r.json(); })
+      .then(() => { updateEvent(id, 'image_url', url); showToast('Image saved ✓'); })
       .catch(() => showToast('Failed to save', true));
     }
 
     function removeImage(id) {
-      if (!confirm('Remove this image?')) return;
+      if (!confirm('Remove image?')) return;
       fetch('/admin/api/events/' + id + '/image', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'Authorization': authToken },
         body: JSON.stringify({ image_url: null })
       })
-      .then(r => { if (!r.ok) throw new Error('Failed'); return r.json(); })
-      .then(() => {
-        const evt = allEvents.find(e => e.id === id);
-        if (evt) evt.image_url = null;
-        updateStats();
-        applyFilters();
-        showToast('Image removed');
+      .then(r => { if (!r.ok) throw new Error(); return r.json(); })
+      .then(() => { updateEvent(id, 'image_url', null); showToast('Image removed'); })
+      .catch(() => showToast('Failed', true));
+    }
+
+    // === DATES TAB ===
+    function setDateSubFilter(filter, btn) {
+      dateSubFilter = filter;
+      document.querySelectorAll('#datesTab .filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      applyDateFilters();
+    }
+
+    function applyDateFilters() {
+      const search = document.getElementById('dateSearchFilter').value.toLowerCase();
+      const source = document.getElementById('dateSourceFilter').value;
+      let filtered = allEvents.filter(e => {
+        if (search && !e.title.toLowerCase().includes(search)) return false;
+        if (source !== 'all' && !e.source_url.includes(source)) return false;
+        if (dateSubFilter === 'missing' && e.event_date) return false;
+        if (dateSubFilter === 'has' && !e.event_date) return false;
+        return true;
+      });
+      document.getElementById('dateCountBar').innerHTML = 'Showing <span>' + filtered.length + '</span> events';
+      renderDateCards(filtered);
+    }
+
+    function renderDateCards(events) {
+      const grid = document.getElementById('datesGrid');
+      grid.innerHTML = events.map(e => {
+        const hasDate = !!e.event_date;
+        const hasImg = hasValidImage(e);
+        const source = e.source_url.includes('showshappening') ? 'ShowsHappening' : e.source_url.includes('visitmalta') ? 'VisitMalta' : 'Unknown';
+        return '<div class="event-card ' + (hasDate ? 'dimmed' : '') + '">' +
+          '<div class="event-preview">' +
+            (hasImg ? '<img src="' + e.image_url + '" onerror="this.parentElement.innerHTML=\\'<div class=no-img>No img</div>\\';">' : '<div class="no-img">No image</div>') +
+            '<div class="badge ' + (hasDate ? 'has' : 'warn') + '">' + (hasDate ? '✓ ' + e.event_date : '✗ No date') + '</div>' +
+          '</div>' +
+          '<div class="event-info">' +
+            '<div class="source">' + source + '</div>' +
+            '<div class="title">' + e.title + '</div>' +
+            '<div class="meta"><a href="' + e.source_url + '" target="_blank">View event page ↗</a> (check date there)</div>' +
+          '</div>' +
+          '<div class="field-row">' +
+            '<input type="text" id="date-' + e.id + '" placeholder="e.g. 14 Feb or 20,21 Mar or Feb to May" value="' + (e.event_date || '') + '">' +
+            '<button onclick="saveDate(' + e.id + ')">Save</button>' +
+          '</div>' +
+          '<div class="date-help">' +
+            '<div class="date-help-title">Quick formats (click to use):</div>' +
+            '<div class="date-chips">' +
+              '<span class="date-chip" onclick="setDateVal(' + e.id + ',\\'14 Feb\\')">14 Feb</span>' +
+              '<span class="date-chip" onclick="setDateVal(' + e.id + ',\\'20,21 Feb\\')">20,21 Feb</span>' +
+              '<span class="date-chip" onclick="setDateVal(' + e.id + ',\\'13,14,15 Mar\\')">13,14,15 Mar</span>' +
+              '<span class="date-chip" onclick="setDateVal(' + e.id + ',\\'14 Feb to 28 Mar\\')">14 Feb to 28 Mar</span>' +
+              '<span class="date-chip" onclick="setDateVal(' + e.id + ',\\'Feb to May\\')">Feb to May</span>' +
+            '</div>' +
+          '</div>' +
+          (hasDate ? '<div class="field-actions"><button class="delete-btn" onclick="removeDate(' + e.id + ')">Clear date</button></div>' : '') +
+        '</div>';
+      }).join('');
+    }
+
+    function setDateVal(id, val) {
+      document.getElementById('date-' + id).value = val;
+      document.getElementById('date-' + id).focus();
+    }
+
+    function saveDate(id) {
+      const val = document.getElementById('date-' + id).value.trim();
+      if (!val) return showToast('Enter a date first', true);
+      fetch('/admin/api/events/' + id + '/date', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': authToken },
+        body: JSON.stringify({ event_date: val })
       })
-      .catch(() => showToast('Failed to remove', true));
+      .then(r => { if (!r.ok) throw new Error(); return r.json(); })
+      .then(data => {
+        if (data.warning) { showToast('Saved, but: ' + data.warning, true); }
+        else { showToast('Date saved ✓'); }
+        updateEvent(id, 'event_date', val);
+      })
+      .catch(() => showToast('Failed to save', true));
+    }
+
+    function removeDate(id) {
+      if (!confirm('Clear this date?')) return;
+      fetch('/admin/api/events/' + id + '/date', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': authToken },
+        body: JSON.stringify({ event_date: null })
+      })
+      .then(r => { if (!r.ok) throw new Error(); return r.json(); })
+      .then(() => { updateEvent(id, 'event_date', null); showToast('Date cleared'); })
+      .catch(() => showToast('Failed', true));
+    }
+
+    // === SHARED ===
+    function updateEvent(id, field, value) {
+      const evt = allEvents.find(e => e.id === id);
+      if (evt) evt[field] = value;
+      updateStats();
+      if (currentTab === 'images') applyFilters();
+      else applyDateFilters();
     }
 
     function showToast(msg, isError) {
@@ -651,6 +810,26 @@ app.put('/admin/api/events/:id/image', (req, res) => {
   const { image_url } = req.body;
   pool.query('UPDATE events SET image_url = $1 WHERE id = $2', [image_url, req.params.id])
     .then(() => res.json({ success: true }))
+    .catch(e => res.status(500).json({ error: e.message }));
+});
+
+// Admin API - Update event date
+app.put('/admin/api/events/:id/date', (req, res) => {
+  if (req.headers.authorization !== (process.env.ADMIN_PASSWORD || 'malta2026')) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  const { event_date } = req.body;
+  
+  // Validate date format if provided
+  let warning = null;
+  if (event_date) {
+    const valid = /^(\d{1,2}[,\d\s]*\s+)?(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i.test(event_date) ||
+                  /^\d{1,2}\s+\w+\s+\d{4}\s*-\s*\d{1,2}\s+\w+\s+\d{4}$/.test(event_date);
+    if (!valid) warning = 'Date format may not be recognized for sorting';
+  }
+  
+  pool.query('UPDATE events SET event_date = $1 WHERE id = $2', [event_date, req.params.id])
+    .then(() => res.json({ success: true, warning }))
     .catch(e => res.status(500).json({ error: e.message }));
 });
 
