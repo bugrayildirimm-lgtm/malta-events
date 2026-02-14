@@ -687,13 +687,28 @@ app.get('/admin', (req, res) => {
 
   <script>
     var E=[],tab='images',sf1v='missing',sf2v='missing',auth='';
-
+    function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
     function doLogin(){
       auth=document.getElementById('pw').value;
       fetch('/admin/api/events',{headers:{Authorization:auth}})
-        .then(function(r){if(!r.ok)throw 0;return r.json()})
-        .then(function(d){E=d;document.getElementById('LS').style.display='none';document.getElementById('AP').style.display='block';us();af1();af2();af3();loadAnalytics()})
-        .catch(function(){toast('Wrong password!',1)});
+        .then(function(r){
+          if(!r.ok)throw new Error('auth');
+          return r.json();
+        })
+        .then(function(d){
+          E=d;
+          document.getElementById('LS').style.display='none';
+          document.getElementById('AP').style.display='block';
+          try{us()}catch(e){console.error('us error',e)}
+          try{af1()}catch(e){console.error('af1 error',e)}
+          try{af2()}catch(e){console.error('af2 error',e)}
+          try{af3()}catch(e){console.error('af3 error',e)}
+          try{loadAnalytics()}catch(e){console.error('analytics error',e)}
+        })
+        .catch(function(e){
+          if(e&&e.message==='auth')toast('Wrong password!',1);
+          else{console.error('Login error:',e);toast('Error: '+e,1)}
+        });
     }
 
     function us(){
@@ -734,7 +749,7 @@ app.get('/admin', (req, res) => {
     function ri(evts){
       document.getElementById('eg1').innerHTML=evts.map(function(e){
         var h=vi(e),s=getSrc(e);
-        return '<div class="ec'+(h?' dim':'')+'"><div class="ep">'+(h?'<img src="'+e.image_url+'" onerror="this.style.display=\'none\'">':'<div class="ni">No image</div>')+'<div class="bdg '+(h?'ok':'miss')+'">'+(h?'✓':'✗')+'</div></div><div class="ei"><div class="src">'+s+'</div><div class="ttl">'+e.title+'</div><div class="mt">'+(e.event_date||'No date')+' · <a href="'+e.source_url+'" target="_blank">View ↗</a></div></div><div class="fr"><input id="img-'+e.id+'" placeholder="Paste image URL..." value="'+(h?e.image_url:'')+'"><button onclick="si('+e.id+')">Save</button></div>'+(h?'<div class="fa"><button class="del" onclick="rmi('+e.id+')">Remove</button></div>':'')+'</div>';
+        return '<div class="ec'+(h?' dim':'')+'"><div class="ep">'+(h?'<img src="'+esc(e.image_url)+'" onerror="this.style.display=\'none\'">':'<div class="ni">No image</div>')+'<div class="bdg '+(h?'ok':'miss')+'">'+(h?'✓':'✗')+'</div></div><div class="ei"><div class="src">'+s+'</div><div class="ttl">'+esc(e.title)+'</div><div class="mt">'+esc(e.event_date||'No date')+' · <a href="'+esc(e.source_url)+'" target="_blank">View ↗</a></div></div><div class="fr"><input id="img-'+e.id+'" placeholder="Paste image URL..." value="'+esc(h?e.image_url:'')+'"><button onclick="si('+e.id+')">Save</button></div>'+(h?'<div class="fa"><button class="del" onclick="rmi('+e.id+')">Remove</button></div>':'')+'</div>';
       }).join('');
     }
     function si(id){
@@ -761,7 +776,7 @@ app.get('/admin', (req, res) => {
     function rd(evts){
       document.getElementById('eg2').innerHTML=evts.map(function(e){
         var hd=!!e.event_date,h=vi(e),s=getSrc(e);
-        return '<div class="ec'+(hd?' dim':'')+'"><div class="ep">'+(h?'<img src="'+e.image_url+'" onerror="this.style.display=\'none\'">':'<div class="ni">No img</div>')+'<div class="bdg '+(hd?'ok':'warn')+'">'+(hd?'✓ '+e.event_date:'✗ No date')+'</div></div><div class="ei"><div class="src">'+s+'</div><div class="ttl">'+e.title+'</div><div class="mt"><a href="'+(e.source_url||'#')+'" target="_blank">View event ↗</a></div></div><div class="fr"><input id="dt-'+e.id+'" placeholder="e.g. 14 Feb or 20,21 Mar" value="'+(e.event_date||'')+'"><button onclick="sd('+e.id+')">Save</button></div><div class="dh"><div class="dh-t">Quick formats:</div><div class="dc"><span class="chip" onclick="sdv('+e.id+',\'14 Feb\')">14 Feb</span><span class="chip" onclick="sdv('+e.id+',\'20,21 Mar\')">20,21 Mar</span><span class="chip" onclick="sdv('+e.id+',\'Feb to May\')">Feb to May</span><span class="chip" onclick="sdv('+e.id+',\'14 Feb to 28 Mar\')">14 Feb to 28 Mar</span></div></div>'+(hd?'<div class="fa"><button class="del" onclick="rmd('+e.id+')">Clear</button></div>':'')+'</div>';
+        return '<div class="ec'+(hd?' dim':'')+'"><div class="ep">'+(h?'<img src="'+esc(e.image_url)+'" onerror="this.style.display=\'none\'">':'<div class="ni">No img</div>')+'<div class="bdg '+(hd?'ok':'warn')+'">'+(hd?'✓ '+esc(e.event_date):'✗ No date')+'</div></div><div class="ei"><div class="src">'+s+'</div><div class="ttl">'+esc(e.title)+'</div><div class="mt"><a href="'+esc(e.source_url||'#')+'" target="_blank">View event ↗</a></div></div><div class="fr"><input id="dt-'+e.id+'" placeholder="e.g. 14 Feb or 20,21 Mar" value="'+esc(e.event_date||'')+'"><button onclick="sd('+e.id+')">Save</button></div><div class="dh"><div class="dh-t">Quick formats:</div><div class="dc"><span class="chip" onclick="sdv('+e.id+',\'14 Feb\')">14 Feb</span><span class="chip" onclick="sdv('+e.id+',\'20,21 Mar\')">20,21 Mar</span><span class="chip" onclick="sdv('+e.id+',\'Feb to May\')">Feb to May</span><span class="chip" onclick="sdv('+e.id+',\'14 Feb to 28 Mar\')">14 Feb to 28 Mar</span></div></div>'+(hd?'<div class="fa"><button class="del" onclick="rmd('+e.id+')">Clear</button></div>':'')+'</div>';
       }).join('');
     }
     function sdv(id,v){document.getElementById('dt-'+id).value=v;document.getElementById('dt-'+id).focus()}
@@ -794,7 +809,7 @@ app.get('/admin', (req, res) => {
       document.getElementById('eg3').innerHTML=evts.map(function(e){
         var h=vi(e),s=getSrc(e);
         var selCats=cats.replace('value="'+(e.category||'')+'"','value="'+(e.category||'')+'" selected');
-        return '<div class="ec'+(e.category?' dim':'')+'"><div class="ep">'+(h?'<img src="'+e.image_url+'" onerror="this.style.display=\'none\'">':'<div class="ni">No img</div>')+'<div class="bdg '+(e.category?'ok':'warn')+'">'+(e.category||'No category')+'</div></div><div class="ei"><div class="src">'+s+'</div><div class="ttl">'+e.title+'</div><div class="mt">'+(e.event_date||'No date')+'</div></div><div class="fr"><select id="cat-'+e.id+'" style="flex:1;padding:8px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:white;font-family:inherit;font-size:0.8rem">'+selCats+'</select><button onclick="sc('+e.id+')">Save</button></div></div>';
+        return '<div class="ec'+(e.category?' dim':'')+'"><div class="ep">'+(h?'<img src="'+esc(e.image_url)+'" onerror="this.style.display=\'none\'">':'<div class="ni">No img</div>')+'<div class="bdg '+(e.category?'ok':'warn')+'">'+(e.category||'No category')+'</div></div><div class="ei"><div class="src">'+s+'</div><div class="ttl">'+esc(e.title)+'</div><div class="mt">'+esc(e.event_date||'No date')+'</div></div><div class="fr"><select id="cat-'+e.id+'" style="flex:1;padding:8px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:white;font-family:inherit;font-size:0.8rem">'+selCats+'</select><button onclick="sc('+e.id+')">Save</button></div></div>';
       }).join('');
     }
     function sc(id){
