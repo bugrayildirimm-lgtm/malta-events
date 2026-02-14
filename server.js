@@ -687,7 +687,7 @@ app.get('/admin', (req, res) => {
 
   <script>
     var E=[],tab='images',sf1v='missing',sf2v='missing',auth='';
-    function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
+    function esc(s){if(!s)return'';return s.replace(/&/g,'&amp;').replace(/\x3c/g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
     function doLogin(){
       auth=document.getElementById('pw').value;
       fetch('/admin/api/events',{headers:{Authorization:auth}})
