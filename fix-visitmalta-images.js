@@ -40,9 +40,14 @@ async function run() {
       const externalImg = event.field_external_image_url?.[0]?.value || null;
       const imageField = event.field_image || [];
       const headerImage = event.field_header_image || [];
+      const dtpImage = event.field_dtp_event_image || [];
+      const appImage = event.field_app_featured_image || [];
       
-      // The target_id in field_image is the media ID
-      const mediaId = imageField[0]?.target_id || headerImage[0]?.target_id || null;
+      // The target_id in these fields is the media ID
+      const mediaId = imageField[0]?.target_id || headerImage[0]?.target_id || dtpImage[0]?.target_id || appImage[0]?.target_id || null;
+
+      // Also check if external image URL field has a value object with target_id
+      const extMediaId = event.field_external_image_url?.[0]?.target_id || null;
       
       // Build the working image URL from media_id
       let imageUrl = null;
@@ -50,6 +55,8 @@ async function run() {
         imageUrl = externalImg;
       } else if (mediaId) {
         imageUrl = `https://api.visitmaltaplus.com/api/v2/images/1?media_id=${mediaId}&height=400`;
+      } else if (extMediaId) {
+        imageUrl = `https://api.visitmaltaplus.com/api/v2/images/1?media_id=${extMediaId}&height=400`;
       }
 
       if (imageUrl) {
@@ -77,9 +84,13 @@ async function run() {
       } else {
         missing++;
         console.log(`✗ No image: ${title}`);
-        // Debug: show all fields that might contain images
-        const fields = Object.keys(event).filter(k => k.includes('image') || k.includes('media') || k.includes('photo'));
-        if (fields.length) console.log(`  Image-related fields: ${fields.join(', ')}`);
+        // Debug: show actual values
+        const dtp = event.field_dtp_event_image?.[0];
+        const app = event.field_app_featured_image?.[0];
+        const ext = event.field_external_image_url?.[0];
+        if (dtp) console.log(`  field_dtp_event_image:`, JSON.stringify(dtp).substring(0, 200));
+        if (app) console.log(`  field_app_featured_image:`, JSON.stringify(app).substring(0, 200));
+        if (ext) console.log(`  field_external_image_url:`, JSON.stringify(ext).substring(0, 200));
       }
     }
 
@@ -98,12 +109,16 @@ async function run() {
         
         const imageField = event.field_image || [];
         const headerImage = event.field_header_image || [];
+        const dtpImage = event.field_dtp_event_image || [];
+        const appImage = event.field_app_featured_image || [];
         const externalImg = event.field_external_image_url?.[0]?.value || null;
-        const mediaId = imageField[0]?.target_id || headerImage[0]?.target_id || null;
+        const mediaId = imageField[0]?.target_id || headerImage[0]?.target_id || dtpImage[0]?.target_id || appImage[0]?.target_id || null;
+        const extMediaId = event.field_external_image_url?.[0]?.target_id || null;
         
         let imageUrl = null;
         if (externalImg && externalImg.startsWith('http')) imageUrl = externalImg;
         else if (mediaId) imageUrl = `https://api.visitmaltaplus.com/api/v2/images/1?media_id=${mediaId}&height=400`;
+        else if (extMediaId) imageUrl = `https://api.visitmaltaplus.com/api/v2/images/1?media_id=${extMediaId}&height=400`;
         
         if (!imageUrl) continue;
 

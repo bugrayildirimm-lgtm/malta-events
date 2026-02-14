@@ -212,8 +212,13 @@ async function scrapeVisitMalta() {
       const description = (summary || bodyHtml.replace(/<[^>]*>/g, '')).trim().substring(0, 500) || null;
 
       const externalImg = event.field_external_image_url?.[0]?.value || null;
-      // Build image URL from media_id if no external image
-      const mediaId = (event.field_image || [])[0]?.target_id || (event.field_header_image || [])[0]?.target_id || null;
+      // Build image URL from media_id - check all possible image fields
+      const mediaId = (event.field_image || [])[0]?.target_id 
+        || (event.field_header_image || [])[0]?.target_id 
+        || (event.field_dtp_event_image || [])[0]?.target_id 
+        || (event.field_app_featured_image || [])[0]?.target_id 
+        || event.field_external_image_url?.[0]?.target_id
+        || null;
       const imageUrl = (externalImg && externalImg.startsWith('http'))
         ? externalImg
         : mediaId
