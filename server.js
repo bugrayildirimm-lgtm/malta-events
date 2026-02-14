@@ -227,6 +227,29 @@ const createCard = (event, isPast) => {
 
 
 // =====================================================================
+// SEO ROUTES
+// =====================================================================
+app.get('/robots.txt', (req, res) => {
+  res.type('text/plain').send(`User-agent: *
+Allow: /
+Disallow: /admin
+Sitemap: https://maltaeventguide.com/sitemap.xml`);
+});
+
+app.get('/sitemap.xml', (req, res) => {
+  const today = new Date().toISOString().split('T')[0];
+  res.type('application/xml').send(`<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://maltaeventguide.com/</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+</urlset>`);
+});
+
+// =====================================================================
 // MAIN ROUTE (PUBLIC SITE)
 // =====================================================================
 app.get('/', async (req, res) => {
@@ -310,8 +333,69 @@ app.get('/', async (req, res) => {
     const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
-  <title>Malta Events | Discover</title>
+  <meta charset="UTF-8">
+  <title>Malta Events 2026 | Concerts, Festivals, Nightlife & Things to Do in Malta</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Discover the best events in Malta and Gozo. Browse concerts, festivals, theatre, nightlife, sports and cultural events. Your complete guide to what's on in Malta.">
+  <meta name="keywords" content="Malta events, things to do in Malta, Malta concerts, Malta festivals, Malta nightlife, Gozo events, what's on Malta, Malta 2026, Malta carnival, Malta theatre, events in Valletta">
+  <meta name="author" content="Malta Event Guide">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://maltaeventguide.com/">
+
+  <!-- Open Graph (Facebook, WhatsApp, LinkedIn) -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Malta Event Guide | What's On in Malta & Gozo">
+  <meta property="og:description" content="Discover concerts, festivals, nightlife, theatre and more. The complete guide to events in Malta.">
+  <meta property="og:url" content="https://maltaeventguide.com/">
+  <meta property="og:site_name" content="Malta Event Guide">
+  <meta property="og:locale" content="en_MT">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Malta Event Guide | What's On in Malta & Gozo">
+  <meta name="twitter:description" content="Discover concerts, festivals, nightlife, theatre and more. The complete guide to events in Malta.">
+
+  <!-- JSON-LD Structured Data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "Malta Event Guide",
+    "url": "https://maltaeventguide.com/",
+    "description": "Discover the best events in Malta and Gozo. Concerts, festivals, theatre, nightlife, sports and cultural events.",
+    "potentialAction": {
+      "@type": "SearchAction",
+      "target": "https://maltaeventguide.com/?q={search_term_string}",
+      "query-input": "required name=search_term_string"
+    }
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    "name": "Upcoming Events in Malta",
+    "numberOfItems": ${upcoming.length},
+    "itemListElement": [${upcoming.slice(0, 20).map((e, i) => `{
+      "@type": "ListItem",
+      "position": ${i + 1},
+      "item": {
+        "@type": "Event",
+        "name": ${JSON.stringify(e.title || '')},
+        "location": {
+          "@type": "Place",
+          "name": ${JSON.stringify(e.location || 'Malta')},
+          "address": { "@type": "PostalAddress", "addressCountry": "MT" }
+        }${e._sort ? `,
+        "startDate": "${e._sort.toISOString().split('T')[0]}"` : ''}${e.description ? `,
+        "description": ${JSON.stringify(e.description.substring(0, 200))}` : ''}${e.image_url ? `,
+        "image": ${JSON.stringify(e.image_url)}` : ''}${e.source_url && !e.source_url.startsWith('manual') ? `,
+        "url": ${JSON.stringify(e.source_url)}` : ''}
+      }
+    }`).join(',')}]
+  }
+  </script>
+
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;700;900&display=swap" rel="stylesheet">
   <style>
     :root { --bg: #f8fafc; --card-bg: #fff; --text: #1e293b; --primary: #FF385C; }
@@ -468,6 +552,14 @@ app.get('/', async (req, res) => {
       filterEvents();
     }
   </script>
+
+  <footer style="margin-top:60px;padding:40px 20px;background:#1e293b;color:#94a3b8;text-align:center;font-size:0.85rem;line-height:1.8">
+    <div style="max-width:800px;margin:0 auto">
+      <h2 style="color:white;font-size:1.2rem;margin:0 0 10px">Malta Event Guide</h2>
+      <p>Your complete guide to events in Malta and Gozo. Discover concerts, festivals, theatre, nightlife, sports, arts and cultural events happening across the Maltese islands.</p>
+      <p style="margin-top:15px;font-size:0.75rem;color:#64748b">&copy; ${new Date().getFullYear()} maltaeventguide.com &middot; Events sourced from ShowsHappening, VisitMalta and local organizers</p>
+    </div>
+  </footer>
 </body>
 </html>`;
     res.send(html);
