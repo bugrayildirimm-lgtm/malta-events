@@ -1312,6 +1312,9 @@ app.post('/admin/api/events', async (req, res) => {
     if (source_url && !source_url.startsWith('http') && !source_url.startsWith('manual:')) source_url = 'https://' + source_url;
     if (image_url && !image_url.startsWith('http')) image_url = 'https://' + image_url;
     
+    // Ensure unique source_url (database has UNIQUE constraint for scraper dedup)
+    if (source_url) source_url = source_url.split('#manual-')[0] + '#manual-' + Date.now();
+    
     // Ensure source_name column exists
     await pool.query('ALTER TABLE events ADD COLUMN IF NOT EXISTS source_name TEXT').catch((e)=>{console.log('ALTER skip:', e.message)});
     
