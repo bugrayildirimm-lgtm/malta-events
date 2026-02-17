@@ -39,6 +39,19 @@ pool.query(`CREATE TABLE IF NOT EXISTS click_tracking (
 pool.query('ALTER TABLE events ADD COLUMN IF NOT EXISTS category TEXT').catch(()=>{});
 pool.query('ALTER TABLE events ADD COLUMN IF NOT EXISTS source_name TEXT').catch(()=>{});
 pool.query('ALTER TABLE events ADD COLUMN IF NOT EXISTS recurring TEXT').catch(()=>{});
+pool.query('ALTER TABLE events ADD COLUMN IF NOT EXISTS slug TEXT').catch(()=>{});
+
+// Generate URL-friendly slug from title
+function generateSlug(title) {
+  if (!title) return 'event-' + Date.now();
+  return title.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // remove accents
+    .replace(/[^a-z0-9\s-]/g, '') // remove special chars
+    .replace(/\s+/g, '-') // spaces to hyphens
+    .replace(/-+/g, '-') // collapse multiple hyphens
+    .replace(/^-|-$/g, '') // trim hyphens
+    .substring(0, 80) || 'event';
+}
 
 // =====================================================================
 // MONTH HELPERS
@@ -213,9 +226,11 @@ const createCard = (event, isPast) => {
     const sourceLower = source.toLowerCase().replace(/\s+/g, '');
     const safeTitle = (title||'').replace(/'/g, "\\'").replace(/"/g, '&quot;');
 
+    const slug = event.slug || generateSlug(event.title);
+
     return `
     <div class="card event-item ${gray}" data-source="${sourceLower}" data-location="${(event.location||'malta').toLowerCase()}" data-category="${(event.category||'').toLowerCase()}">
-        <a href="${event.source_url || '#'}" target="_blank" class="card-media-link" onclick="trackClick(${event.id},'${safeTitle}','${source}')">
+        <a href="/event/${slug}" class="card-media-link">
         <div class="card-media">
             ${dateHTML} ${expired}
             <div class="fallback" style="background: ${bgStyle}; position:absolute;top:0;left:0;z-index:1;">${firstLetter}</div>
@@ -229,7 +244,7 @@ const createCard = (event, isPast) => {
             ${dateInfo}
             ${recurTag}
             <div class="description">${desc}</div>
-            <a href="${event.source_url || '#'}" target="_blank" class="btn" onclick="trackClick(${event.id},'${safeTitle}','${source}')">Details</a>
+            <a href="/event/${slug}" class="btn">Details</a>
         </div>
     </div>`;
 };
@@ -245,8 +260,18 @@ Disallow: /admin
 Sitemap: https://maltaeventguide.com/sitemap.xml`);
 });
 
-app.get('/sitemap.xml', (req, res) => {
+app.get('/sitemap.xml', async (req, res) => {
   const today = new Date().toISOString().split('T')[0];
+  let eventUrls = '';
+  try {
+    const result = await pool.query('SELECT slug FROM events WHERE slug IS NOT NULL');
+    eventUrls = result.rows.map(r => `  <url>
+    <loc>https://maltaeventguide.com/event/${r.slug}</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>`).join('\n');
+  } catch(e) {}
   res.type('application/xml').send(`<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
@@ -255,6 +280,7 @@ app.get('/sitemap.xml', (req, res) => {
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
+${eventUrls}
 </urlset>`);
 });
 
@@ -277,6 +303,20 @@ app.get('/', async (req, res) => {
     const result = await pool.query('SELECT * FROM events');
     const allEvents = result.rows;
     const today = new Date(); today.setHours(0,0,0,0);
+
+    // Auto-generate slugs for events without them
+    const usedSlugs = new Set(allEvents.filter(e => e.slug).map(e => e.slug));
+    for (const event of allEvents) {
+      if (!event.slug) {
+        let slug = generateSlug(event.title);
+        let suffix = 2;
+        let candidate = slug;
+        while (usedSlugs.has(candidate)) { candidate = slug + '-' + suffix; suffix++; }
+        event.slug = candidate;
+        usedSlugs.add(candidate);
+        pool.query('UPDATE events SET slug = $1 WHERE id = $2', [candidate, event.id]).catch(()=>{});
+      }
+    }
 
     // Collect unique sources and locations for filters
     const sources = new Set();
@@ -477,11 +517,8 @@ app.get('/', async (req, res) => {
     .hidden { display:none; }
     .event-count { text-align:center; color:#94a3b8; font-size:0.9rem; margin-bottom:20px; }
 
-    /* Photo link - hidden on desktop, clickable on mobile */
-    .card-media-link { display:contents; pointer-events:none; text-decoration:none; }
-    @media (max-width: 768px) {
-      .card-media-link { pointer-events:auto; cursor:pointer; }
-    }
+    /* Photo link - clickable on all devices, links to event page */
+    .card-media-link { display:contents; text-decoration:none; cursor:pointer; }
     .recurring-tag { display:inline-block; background:#dbeafe; color:#1d4ed8; font-size:0.75rem; font-weight:600; padding:3px 10px; border-radius:20px; margin-bottom:8px; }
   </style>
 </head>
@@ -597,6 +634,203 @@ app.get('/', async (req, res) => {
     res.send(html);
   } catch (err) {
     res.status(500).send("Database error: " + err.message);
+  }
+});
+
+
+// =====================================================================
+// INDIVIDUAL EVENT PAGE (SEO - one page per event)
+// =====================================================================
+app.get('/event/:slug', async (req, res) => {
+  try {
+    const slug = req.params.slug;
+    const result = await pool.query('SELECT * FROM events WHERE slug = $1', [slug]);
+    if (!result.rows.length) return res.redirect('/');
+    
+    const event = result.rows[0];
+    const title = event.title || 'Event';
+    const desc = (event.description || 'Discover this event in Malta.').substring(0, 160);
+    const loc = event.location || 'Malta';
+    const dateStr = event.recurring ? (event.event_date || '') + ' · ' + event.recurring : (event.event_date || '');
+    const img = event.image_url || '';
+    const hasImg = img && !img.includes('/api/v2/file/');
+    
+    let source = event.source_name || 'Other';
+    if (!event.source_name) {
+      if (event.source_url && event.source_url.includes('showshappening')) source = 'ShowsHappening';
+      else if (event.source_url && event.source_url.includes('visitmalta')) source = 'VisitMalta';
+      else if (event.source_url && event.source_url.includes('eventbrite')) source = 'Eventbrite';
+    }
+
+    // Clean external URL (remove #manual- fragment)
+    let externalUrl = (event.source_url || '').split('#manual-')[0];
+    if (!externalUrl || externalUrl === 'manual://added') externalUrl = null;
+
+    // Get related events (same category, different event)
+    let related = [];
+    try {
+      if (event.category) {
+        const rel = await pool.query(
+          'SELECT id, title, slug, image_url, event_date, location, category FROM events WHERE category = $1 AND id != $2 AND slug IS NOT NULL ORDER BY RANDOM() LIMIT 6',
+          [event.category, event.id]
+        );
+        related = rel.rows;
+      }
+    } catch(e) {}
+
+    // Structured data for this specific event
+    const startDate = getStartDate(event.event_date);
+    const jsonLd = {
+      "@context": "https://schema.org",
+      "@type": "Event",
+      "name": title,
+      "description": event.description || desc,
+      "location": {
+        "@type": "Place",
+        "name": loc,
+        "address": { "@type": "PostalAddress", "addressCountry": "MT", "addressLocality": loc }
+      }
+    };
+    if (startDate) jsonLd.startDate = startDate.toISOString().split('T')[0];
+    if (hasImg) jsonLd.image = img;
+    if (externalUrl) jsonLd.url = externalUrl;
+    if (event.category) jsonLd.eventAttendanceMode = "https://schema.org/OfflineEventAttendanceMode";
+
+    const firstLetter = title.charAt(0).toUpperCase();
+    const colors = [
+      'linear-gradient(135deg, #FF9A9E 0%, #FECFEF 100%)',
+      'linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%)',
+      'linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%)',
+      'linear-gradient(135deg, #fccb90 0%, #d57eeb 100%)'
+    ];
+    const bgStyle = colors[(firstLetter.charCodeAt(0)||0) % colors.length];
+    const catEmojis = {'Music & Concerts':'🎵','Theatre & Shows':'🎭','Dance':'💃','Nightlife & Parties':'🎉','Festivals':'🎪','Arts & Culture':'🎨','Sports & Adventure':'🏃','Food & Drink':'🍷','Family':'👨‍👩‍👧','Religious':'⛪','Conference':'📋','Other':'📌'};
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>${title} — ${loc} | Malta Event Guide</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="${desc.replace(/"/g, '&quot;')} — ${dateStr} at ${loc}. Find event details on Malta Event Guide.">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://maltaeventguide.com/event/${slug}">
+
+  <meta property="og:type" content="event">
+  <meta property="og:title" content="${title} — ${loc}">
+  <meta property="og:description" content="${desc.replace(/"/g, '&quot;')} — ${dateStr}">
+  <meta property="og:url" content="https://maltaeventguide.com/event/${slug}">
+  <meta property="og:site_name" content="Malta Event Guide">
+  ${hasImg ? '<meta property="og:image" content="' + img + '">' : ''}
+
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="${title} — ${loc}">
+  <meta name="twitter:description" content="${desc.replace(/"/g, '&quot;')}">
+  ${hasImg ? '<meta name="twitter:image" content="' + img + '">' : ''}
+
+  <script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
+
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root { --bg: #f8fafc; --card-bg: #fff; --text: #1e293b; --primary: #FF385C; }
+    body { font-family:'Outfit',sans-serif; background:var(--bg); margin:0; color:var(--text); }
+    a { color: var(--primary); text-decoration:none; }
+    
+    .nav { background:#0f172a; padding:15px 20px; display:flex; align-items:center; gap:15px; }
+    .nav a { color:white; font-weight:700; font-size:1.1rem; }
+    .nav .back { color:#94a3b8; font-size:0.85rem; }
+    
+    .hero { position:relative; height:350px; background:#1e293b; overflow:hidden; }
+    .hero img { width:100%; height:100%; object-fit:cover; }
+    .hero .fallback { width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:white;font-size:8rem;font-weight:800; }
+    
+    .content { max-width:800px; margin:-60px auto 0; padding:0 20px 40px; position:relative; z-index:2; }
+    .main-card { background:white; border-radius:20px; padding:35px; box-shadow:0 10px 40px rgba(0,0,0,0.1); }
+    
+    .source-badge { display:inline-block; background:#f1f5f9; color:#64748b; padding:4px 12px; border-radius:20px; font-size:0.75rem; font-weight:600; text-transform:uppercase; margin-bottom:12px; }
+    h1 { font-size:2rem; font-weight:900; margin:0 0 15px; line-height:1.2; }
+    .meta { display:flex; flex-wrap:wrap; gap:15px; color:#64748b; font-size:0.9rem; margin-bottom:20px; }
+    .meta-item { display:flex; align-items:center; gap:5px; }
+    .cat-badge { display:inline-block; background:#dbeafe; color:#1d4ed8; padding:4px 12px; border-radius:20px; font-size:0.8rem; font-weight:600; }
+    .recur-badge { display:inline-block; background:#dcfce7; color:#15803d; padding:4px 12px; border-radius:20px; font-size:0.8rem; font-weight:600; }
+    .desc { color:#475569; line-height:1.8; font-size:1rem; margin:20px 0; }
+    
+    .cta { display:block; width:100%; padding:18px; background:#0f172a; color:white; text-align:center; border-radius:14px; font-weight:800; font-size:1.1rem; transition:0.3s; box-sizing:border-box; margin-top:25px; }
+    .cta:hover { background:var(--primary); transform:translateY(-2px); box-shadow:0 8px 25px rgba(255,56,92,0.3); }
+    
+    .related { max-width:800px; margin:40px auto; padding:0 20px; }
+    .related h2 { font-size:1.3rem; margin-bottom:15px; }
+    .related-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:15px; }
+    .rel-card { background:white; border-radius:12px; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,0.06); transition:transform 0.2s; text-decoration:none; color:var(--text); }
+    .rel-card:hover { transform:translateY(-3px); box-shadow:0 8px 20px rgba(0,0,0,0.1); }
+    .rel-img { height:120px; background:#eee; overflow:hidden; }
+    .rel-img img { width:100%; height:100%; object-fit:cover; }
+    .rel-info { padding:12px; }
+    .rel-info .ttl { font-weight:700; font-size:0.85rem; margin-bottom:4px; }
+    .rel-info .dt { color:#94a3b8; font-size:0.75rem; }
+    
+    .footer { margin-top:40px;padding:30px 20px;background:#1e293b;color:#94a3b8;text-align:center;font-size:0.8rem;line-height:1.8; }
+    .footer a { color:#94a3b8; }
+    
+    @media (max-width:600px) {
+      .hero { height:250px; }
+      h1 { font-size:1.5rem; }
+      .content { margin-top:-40px; }
+      .main-card { padding:22px; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <a href="/">Malta Events Guide</a>
+    <a href="/" class="back">← All Events</a>
+  </nav>
+
+  <div class="hero">
+    ${hasImg ? '<img src="' + img + '" alt="' + title.replace(/"/g, '&quot;') + '" onerror="this.parentElement.innerHTML=\'<div class=fallback style=background:' + bgStyle + '>' + firstLetter + '</div>\'">' : '<div class="fallback" style="background:' + bgStyle + '">' + firstLetter + '</div>'}
+  </div>
+
+  <div class="content">
+    <div class="main-card">
+      <div class="source-badge">${source}</div>
+      <h1>${title}</h1>
+      <div class="meta">
+        ${dateStr ? '<div class="meta-item">📅 ' + dateStr + '</div>' : ''}
+        ${loc !== 'Malta' ? '<div class="meta-item">📍 ' + loc + '</div>' : '<div class="meta-item">📍 Malta</div>'}
+      </div>
+      ${event.category ? '<span class="cat-badge">' + (catEmojis[event.category]||'') + ' ' + event.category + '</span> ' : ''}
+      ${event.recurring ? '<span class="recur-badge">🔁 ' + event.recurring + '</span>' : ''}
+      ${event.description ? '<div class="desc">' + event.description + '</div>' : ''}
+      ${externalUrl ? '<a href="' + externalUrl + '" target="_blank" class="cta" onclick="fetch(\'/api/track\',{method:\'POST\',headers:{\'Content-Type\':\'application/json\'},body:JSON.stringify({event_id:' + event.id + ',event_title:\'' + title.replace(/'/g, "\\'") + '\',source:\'' + source + '\'})})">View Event / Get Tickets →</a>' : '<a href="/" class="cta">← Browse More Events</a>'}
+    </div>
+  </div>
+
+  ${related.length > 0 ? `
+  <div class="related">
+    <h2>You might also like</h2>
+    <div class="related-grid">
+      ${related.map(r => {
+        const rImg = r.image_url && !r.image_url.includes('/api/v2/file/') ? r.image_url : '';
+        const rLetter = (r.title||'E').charAt(0).toUpperCase();
+        const rBg = colors[(rLetter.charCodeAt(0)||0) % colors.length];
+        return `<a href="/event/${r.slug}" class="rel-card">
+          <div class="rel-img">${rImg ? '<img src="' + rImg + '" onerror="this.hidden=1">' : '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:' + rBg + ';color:white;font-size:2rem;font-weight:800">' + rLetter + '</div>'}</div>
+          <div class="rel-info"><div class="ttl">${r.title}</div><div class="dt">${r.event_date || ''} · ${r.location || 'Malta'}</div></div>
+        </a>`;
+      }).join('')}
+    </div>
+  </div>` : ''}
+
+  <div class="footer">
+    <a href="/">Malta Event Guide</a> — Your complete guide to events in Malta & Gozo<br>
+    &copy; ${new Date().getFullYear()} maltaeventguide.com · Powered by <a href="https://bugrayildirim.me/" target="_blank">Bugra</a>
+  </div>
+</body>
+</html>`;
+    res.send(html);
+  } catch (err) {
+    console.error('Event page error:', err);
+    res.redirect('/');
   }
 });
 
@@ -1286,8 +1520,8 @@ app.put('/admin/api/events/:id', async (req, res) => {
     await pool.query('ALTER TABLE events ADD COLUMN IF NOT EXISTS source_name TEXT').catch(()=>{});
     await pool.query('ALTER TABLE events ADD COLUMN IF NOT EXISTS recurring TEXT').catch(()=>{});
     await pool.query(
-      `UPDATE events SET title=$1, event_date=$2, location=$3, source_name=$4, category=$5, image_url=$6, source_url=$7, description=$8, recurring=$9 WHERE id=$10`,
-      [title, event_date, location, source_name, category, image_url, source_url, description, recurring || null, req.params.id]
+      `UPDATE events SET title=$1, event_date=$2, location=$3, source_name=$4, category=$5, image_url=$6, source_url=$7, description=$8, recurring=$9, slug=$10 WHERE id=$11`,
+      [title, event_date, location, source_name, category, image_url, source_url, description, recurring || null, generateSlug(title) + '-' + req.params.id, req.params.id]
     );
     // Also update overrides
     const evt = await pool.query('SELECT source_url FROM events WHERE id = $1', [req.params.id]);
@@ -1337,8 +1571,8 @@ app.post('/admin/api/events', async (req, res) => {
     let result;
     try {
       result = await pool.query(
-        'INSERT INTO events (title, event_date, location, image_url, source_url, description, category, source_name, recurring) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *',
-        [title, event_date, location || 'Malta', image_url || null, source_url || 'manual://added', description || null, category || null, source_name || null, recurring || null]
+        'INSERT INTO events (title, event_date, location, image_url, source_url, description, category, source_name, recurring, slug) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *',
+        [title, event_date, location || 'Malta', image_url || null, source_url || 'manual://added', description || null, category || null, source_name || null, recurring || null, generateSlug(title) + '-' + Date.now().toString(36)]
       );
     } catch (e1) {
       console.log('Insert with recurring failed:', e1.message);
