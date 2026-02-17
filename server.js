@@ -281,11 +281,21 @@ app.get('/', async (req, res) => {
     });
 
     allEvents.forEach(event => {
+        // Normalize source_name to prevent duplicates (trim and title case)
+        if (event.source_name) {
+          event.source_name = event.source_name.trim().replace(/\s+/g, ' ');
+        }
         // Collect filter data
-        if (event.source_name) sources.add(event.source_name);
-        else if (event.source_url && event.source_url.includes('showshappening')) sources.add('ShowsHappening');
-        else if (event.source_url && event.source_url.includes('visitmalta')) sources.add('VisitMalta');
-        else if (event.source_url && event.source_url.includes('eventbrite')) sources.add('Eventbrite');
+        const srcName = event.source_name
+          || (event.source_url && event.source_url.includes('showshappening') ? 'ShowsHappening' : null)
+          || (event.source_url && event.source_url.includes('visitmalta') ? 'VisitMalta' : null)
+          || (event.source_url && event.source_url.includes('eventbrite') ? 'Eventbrite' : null);
+        if (srcName) {
+          // Deduplicate by comparing lowercase
+          const existing = Array.from(sources).find(s => s.toLowerCase() === srcName.toLowerCase());
+          if (!existing) sources.add(srcName);
+          else event.source_name = existing; // normalize to the first version seen
+        }
         if (event.location && event.location !== 'Malta') locations.add(event.location);
         if (event.category) categories.add(event.category);
 
@@ -707,6 +717,7 @@ app.get('/admin', (req, res) => {
       <div class="tab active" onclick="switchTab('images',this)">🖼️ Images <span class="tc" id="ic">0</span></div>
       <div class="tab" onclick="switchTab('dates',this)">📅 Dates <span class="tc" id="dc">0</span></div>
       <div class="tab" onclick="switchTab('categories',this)">🏷️ Categories <span class="tc" id="cc">0</span></div>
+      <div class="tab" onclick="switchTab('manage',this)">📋 Manage</div>
       <div class="tab" onclick="switchTab('add',this)">➕ Add Event</div>
       <div class="tab" onclick="switchTab('analytics',this)">📊 Analytics</div>
     </div>
@@ -762,6 +773,50 @@ app.get('/admin', (req, res) => {
       <div class="events-grid" id="eg3"></div>
     </div>
 
+    <!-- MANAGE TAB -->
+    <div id="manageTab" style="display:none">
+      <!-- Source Stats -->
+      <div id="sourceStats" style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:20px"></div>
+      
+      <!-- Duplicate Warning -->
+      <div id="dupWarn" style="display:none;background:#422006;border:1px solid #92400e;border-radius:12px;padding:15px;margin-bottom:20px">
+        <h4 style="color:#fbbf24;margin:0 0 10px">⚠️ Possible Duplicates</h4>
+        <div id="dupList"></div>
+      </div>
+
+      <!-- Filters and Bulk Actions -->
+      <div class="filters">
+        <input type="text" id="sf4" placeholder="🔍 Search events..." oninput="af4()">
+        <select id="ss4" onchange="af4()" style="padding:8px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:white;font-family:inherit">
+          <option value="all">All Sources</option>
+        </select>
+        <button class="fb" onclick="selectAll4()" id="selBtn4">Select All</button>
+        <button class="fb" onclick="bulkDel()" style="background:#7f1d1d;color:#fca5a5">🗑️ Delete Selected</button>
+      </div>
+      <div class="cb" id="cb4">Loading...</div>
+      <div class="events-grid" id="eg4"></div>
+
+      <!-- Edit Modal -->
+      <div id="editModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);z-index:1000;overflow-y:auto;padding:20px">
+        <div style="max-width:600px;margin:40px auto;background:#1e293b;border-radius:16px;padding:24px">
+          <h3 style="color:white;margin:0 0 20px">✏️ Edit Event</h3>
+          <input type="hidden" id="ed_id">
+          <div class="form-group"><label>Title</label><input type="text" id="ed_title"></div>
+          <div class="form-group"><label>Date</label><input type="text" id="ed_date" placeholder="e.g. 14 Feb or 20,21 Mar"></div>
+          <div class="form-group"><label>Location</label><input type="text" id="ed_loc"></div>
+          <div class="form-group"><label>Source</label><input type="text" id="ed_source" placeholder="e.g. ShowsHappening, VisitMalta..."></div>
+          <div class="form-group"><label>Category</label><select id="ed_cat" style="width:100%;padding:10px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:white;font-family:inherit"><option value="">Select...</option><option value="Music & Concerts">🎵 Music & Concerts</option><option value="Theatre & Shows">🎭 Theatre & Shows</option><option value="Dance">💃 Dance</option><option value="Nightlife & Parties">🎉 Nightlife & Parties</option><option value="Festivals">🎪 Festivals</option><option value="Arts & Culture">🎨 Arts & Culture</option><option value="Sports & Adventure">🏃 Sports & Adventure</option><option value="Food & Drink">🍷 Food & Drink</option><option value="Family">👨‍👩‍👧 Family</option><option value="Religious">⛪ Religious</option><option value="Conference">📋 Conference</option><option value="Other">📌 Other</option></select></div>
+          <div class="form-group"><label>Image URL</label><input type="text" id="ed_img"></div>
+          <div class="form-group"><label>Event URL</label><input type="text" id="ed_url"></div>
+          <div class="form-group"><label>Description</label><textarea id="ed_desc" rows="3"></textarea></div>
+          <div style="display:flex;gap:10px;margin-top:15px">
+            <button onclick="saveEdit()" style="flex:1;padding:12px;background:#22c55e;color:white;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-family:inherit">Save Changes</button>
+            <button onclick="closeEdit()" style="flex:1;padding:12px;background:#334155;color:white;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-family:inherit">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- ADD EVENT TAB -->
     <div id="addTab" style="display:none">
       <div class="add-form">
@@ -814,6 +869,7 @@ function doLogin(){
       try{af1()}catch(e){console.error('af1',e)}
       try{af2()}catch(e){console.error('af2',e)}
       try{af3()}catch(e){console.error('af3',e)}
+      try{af4()}catch(e){console.error('af4',e)}
       try{loadAnalytics()}catch(e){console.error('analytics',e)}
     })
     .catch(function(e){
@@ -835,8 +891,8 @@ function switchTab(t,el){
   tab=t;
   document.querySelectorAll('.tab').forEach(function(x){x.classList.remove('active')});
   el.classList.add('active');
-  ['imagesTab','datesTab','categoriesTab','addTab','analyticsTab'].forEach(function(id){document.getElementById(id).style.display='none'});
-  var map={images:'imagesTab',dates:'datesTab',categories:'categoriesTab',add:'addTab',analytics:'analyticsTab'};
+  ['imagesTab','datesTab','categoriesTab','manageTab','addTab','analyticsTab'].forEach(function(id){document.getElementById(id).style.display='none'});
+  var map={images:'imagesTab',dates:'datesTab',categories:'categoriesTab',manage:'manageTab',add:'addTab',analytics:'analyticsTab'};
   document.getElementById(map[t]).style.display='';
   if(t==='analytics')loadAnalytics();
 }
@@ -957,12 +1013,150 @@ function loadAnalytics(){
       }).join('')||'<tr><td colspan="3" style="color:#64748b">No clicks yet<\\/td><\\/tr>';
     }).catch(function(){});
 }
+// MANAGE TAB
+var sel4={};
+function af4(){
+  var q=document.getElementById('sf4').value.toLowerCase();
+  var s=document.getElementById('ss4').value;
+  var f=E.filter(function(e){
+    if(q&&e.title.toLowerCase().indexOf(q)<0)return 0;
+    if(s!=='all'&&getSource(e)!==s&&(e.source_name||'').toLowerCase()!==s.toLowerCase())return 0;
+    return 1;
+  });
+  document.getElementById('cb4').innerHTML='Showing <span>'+f.length+'<\/span> of '+E.length+' events';
+  rm(f);
+  buildSourceStats();
+  detectDuplicates();
+  buildSourceFilter4();
+}
+function buildSourceFilter4(){
+  var ss=document.getElementById('ss4');
+  var cur=ss.value;
+  var srcs={};
+  E.forEach(function(e){
+    var s=e.source_name||getSrc(e);
+    var k=s.toLowerCase();
+    if(!srcs[k])srcs[k]={name:s,count:0};
+    srcs[k].count++;
+  });
+  var html='<option value="all">All Sources<\/option>';
+  Object.keys(srcs).sort().forEach(function(k){
+    html+='<option value="'+k+'">'+srcs[k].name+' ('+srcs[k].count+')<\/option>';
+  });
+  ss.innerHTML=html;
+  ss.value=cur;
+}
+function buildSourceStats(){
+  var srcs={};
+  E.forEach(function(e){
+    var s=e.source_name||getSrc(e);
+    if(!srcs[s])srcs[s]=0;
+    srcs[s]++;
+  });
+  var html='';
+  Object.keys(srcs).sort().forEach(function(s){
+    html+='<div style="background:#0f172a;border:1px solid #334155;border-radius:10px;padding:12px 18px;text-align:center;min-width:120px"><div style="font-size:1.5rem;font-weight:800;color:white">'+srcs[s]+'<\/div><div style="font-size:0.75rem;color:#94a3b8;margin-top:2px">'+s+'<\/div><\/div>';
+  });
+  html+='<div style="background:#0f172a;border:1px solid #22c55e;border-radius:10px;padding:12px 18px;text-align:center;min-width:120px"><div style="font-size:1.5rem;font-weight:800;color:#22c55e">'+E.length+'<\/div><div style="font-size:0.75rem;color:#94a3b8;margin-top:2px">Total<\/div><\/div>';
+  document.getElementById('sourceStats').innerHTML=html;
+}
+function detectDuplicates(){
+  var titles={};
+  E.forEach(function(e){
+    var k=(e.title||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+    if(k.length<5)return;
+    if(!titles[k])titles[k]=[];
+    titles[k].push(e);
+  });
+  var dups=[];
+  Object.keys(titles).forEach(function(k){
+    if(titles[k].length>1)dups.push(titles[k]);
+  });
+  var warn=document.getElementById('dupWarn');
+  if(dups.length===0){warn.style.display='none';return}
+  warn.style.display='block';
+  var html='';
+  dups.forEach(function(group){
+    html+='<div style="margin-bottom:10px;padding:8px;background:#1c1917;border-radius:8px">';
+    html+='<div style="color:#fbbf24;font-weight:700;margin-bottom:5px">\u26a0 "'+esc(group[0].title)+'" appears '+group.length+' times<\/div>';
+    group.forEach(function(e){
+      html+='<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;color:#d6d3d1"><span>ID: '+e.id+' \u00b7 '+getSrc(e)+' \u00b7 '+(e.event_date||'no date')+'<\/span><button onclick="delEvt('+e.id+')" style="background:#7f1d1d;color:#fca5a5;border:none;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:0.75rem">Delete<\/button><\/div>';
+    });
+    html+='<\/div>';
+  });
+  document.getElementById('dupList').innerHTML=html;
+}
+function rm(evts){
+  document.getElementById('eg4').innerHTML=evts.map(function(e){
+    var h=vi(e),s=e.source_name||getSrc(e);
+    var checked=sel4[e.id]?' checked':'';
+    return '<div class="ec" style="position:relative"><div style="position:absolute;top:8px;left:8px;z-index:5"><input type="checkbox" id="chk-'+e.id+'" onchange="togSel('+e.id+')"'+checked+' style="width:18px;height:18px;cursor:pointer"><\/div><div class="ep">'+(h?'<img src="'+esc(e.image_url)+'" onerror="this.hidden=1">':'<div class="ni">No img<\/div>')+'<\/div><div class="ei"><div class="src">'+esc(s)+'<\/div><div class="ttl">'+esc(e.title)+'<\/div><div class="mt">'+esc(e.event_date||'No date')+' \u00b7 '+esc(e.location||'Malta')+'<\/div><div class="mt">'+(e.category?esc(e.category):'<span style="color:#f87171">No category<\/span>')+'<\/div><\/div><div class="fr" style="gap:6px"><button onclick="openEdit('+e.id+')" style="flex:1">\u270f\ufe0f Edit<\/button><button class="del" onclick="delEvt('+e.id+')" style="flex:1">\u274c Delete<\/button><\/div><\/div>';
+  }).join('');
+}
+function togSel(id){sel4[id]=document.getElementById('chk-'+id).checked;if(!sel4[id])delete sel4[id]}
+function selectAll4(){
+  var boxes=document.querySelectorAll('#eg4 input[type=checkbox]');
+  var allSel=Object.keys(sel4).length===boxes.length;
+  boxes.forEach(function(b){
+    var id=parseInt(b.id.replace('chk-',''));
+    b.checked=!allSel;
+    if(!allSel)sel4[id]=true;else delete sel4[id];
+  });
+}
+function bulkDel(){
+  var ids=Object.keys(sel4);
+  if(ids.length===0)return toast('No events selected',1);
+  if(!confirm('Delete '+ids.length+' events permanently?'))return;
+  var done=0;
+  ids.forEach(function(id){
+    api('DELETE','/admin/api/events/'+id,{},function(){
+      done++;
+      E=E.filter(function(x){return x.id!==parseInt(id)});
+      delete sel4[id];
+      if(done===ids.length){us();af4();toast(done+' events deleted');}
+    });
+  });
+}
+function openEdit(id){
+  var e=E.find(function(x){return x.id===id});
+  if(!e)return;
+  document.getElementById('ed_id').value=id;
+  document.getElementById('ed_title').value=e.title||'';
+  document.getElementById('ed_date').value=e.event_date||'';
+  document.getElementById('ed_loc').value=e.location||'';
+  document.getElementById('ed_source').value=e.source_name||getSrc(e);
+  document.getElementById('ed_cat').value=e.category||'';
+  document.getElementById('ed_img').value=e.image_url||'';
+  document.getElementById('ed_url').value=e.source_url||'';
+  document.getElementById('ed_desc').value=e.description||'';
+  document.getElementById('editModal').style.display='block';
+}
+function closeEdit(){document.getElementById('editModal').style.display='none'}
+function saveEdit(){
+  var id=parseInt(document.getElementById('ed_id').value);
+  var data={
+    title:document.getElementById('ed_title').value.trim(),
+    event_date:document.getElementById('ed_date').value.trim()||null,
+    location:document.getElementById('ed_loc').value.trim()||'Malta',
+    source_name:document.getElementById('ed_source').value.trim()||null,
+    category:document.getElementById('ed_cat').value||null,
+    image_url:document.getElementById('ed_img').value.trim()||null,
+    source_url:document.getElementById('ed_url').value.trim()||null,
+    description:document.getElementById('ed_desc').value.trim()||null
+  };
+  if(!data.title)return toast('Title required',1);
+  api('PUT','/admin/api/events/'+id,data,function(){
+    var e=E.find(function(x){return x.id===id});
+    if(e)Object.assign(e,data);
+    closeEdit();us();af4();toast('Event updated \u2713');
+  });
+}
 function delEvt(id){
   if(!confirm('Delete this event permanently?'))return;
   api('DELETE','/admin/api/events/'+id,{},function(){
     E=E.filter(function(x){return x.id!==id});
     us();
-    if(tab==='images')af1();else if(tab==='dates')af2();else if(tab==='categories')af3();
+    if(tab==='images')af1();else if(tab==='dates')af2();else if(tab==='categories')af3();else if(tab==='manage')af4();
     toast('Event deleted');
   });
 }
@@ -973,7 +1167,7 @@ function getSource(e){
   return 'manual';
 }
 function getSrc(e){if(e.source_name)return e.source_name;var s=getSource(e);return s==='showshappening'?'ShowsHappening':s==='visitmalta'?'VisitMalta':'Other'}
-function ue(id,f,v){var e=E.find(function(x){return x.id===id});if(e)e[f]=v;us();if(tab==='images')af1();else if(tab==='dates')af2();else if(tab==='categories')af3()}
+function ue(id,f,v){var e=E.find(function(x){return x.id===id});if(e)e[f]=v;us();if(tab==='images')af1();else if(tab==='dates')af2();else if(tab==='categories')af3();else if(tab==='manage')af4()}
 function api(method,url,body,cb){
   fetch(url,{method:method,headers:{'Content-Type':'application/json',Authorization:auth},body:JSON.stringify(body)})
     .then(function(r){if(!r.ok)throw 0;return r.json()}).then(cb).catch(function(){toast('Failed',1)});
@@ -1042,6 +1236,28 @@ app.delete('/admin/api/events/:id', async (req, res) => {
   if (!authCheck(req, res)) return;
   try {
     await pool.query('DELETE FROM events WHERE id = $1', [req.params.id]);
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Update full event (edit)
+app.put('/admin/api/events/:id', async (req, res) => {
+  if (!authCheck(req, res)) return;
+  try {
+    const { title, event_date, location, source_name, category, image_url, source_url, description } = req.body;
+    await pool.query('ALTER TABLE events ADD COLUMN IF NOT EXISTS source_name TEXT').catch(()=>{});
+    await pool.query(
+      `UPDATE events SET title=$1, event_date=$2, location=$3, source_name=$4, category=$5, image_url=$6, source_url=$7, description=$8 WHERE id=$9`,
+      [title, event_date, location, source_name, category, image_url, source_url, description, req.params.id]
+    );
+    // Also update overrides
+    const evt = await pool.query('SELECT source_url FROM events WHERE id = $1', [req.params.id]);
+    if (evt.rows[0]) {
+      await pool.query(
+        'INSERT INTO event_overrides (source_url, image_url, category) VALUES ($1, $2, $3) ON CONFLICT (source_url) DO UPDATE SET image_url=COALESCE($2,event_overrides.image_url), category=COALESCE($3,event_overrides.category)',
+        [evt.rows[0].source_url, image_url, category]
+      ).catch(()=>{});
+    }
     res.json({ success: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
