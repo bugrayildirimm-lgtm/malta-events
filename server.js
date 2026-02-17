@@ -35,6 +35,10 @@ pool.query(`CREATE TABLE IF NOT EXISTS click_tracking (
   referrer TEXT
 )`).catch(()=>{});
 
+// Ensure columns exist
+pool.query('ALTER TABLE events ADD COLUMN IF NOT EXISTS category TEXT').catch(()=>{});
+pool.query('ALTER TABLE events ADD COLUMN IF NOT EXISTS source_name TEXT').catch(()=>{});
+
 // =====================================================================
 // MONTH HELPERS
 // =====================================================================
@@ -991,8 +995,10 @@ function addEvent(){
   var loc=document.getElementById('ae_loc').value.trim();
   var cat=document.getElementById('ae_cat').value;
   var img=document.getElementById('ae_img').value.trim()||null;
+  if(img&&img.indexOf('http')!==0)img='https://'+img;
   var src=document.getElementById('ae_source').value;
   var url=document.getElementById('ae_url').value.trim()||null;
+  if(url&&url.indexOf('http')!==0)url='https://'+url;
   if(!src)return toast('Source is required',1);
   if(!url)return toast('Event URL is required',1);
   var desc=document.getElementById('ae_desc').value.trim()||null;
@@ -1143,14 +1149,18 @@ function openEdit(id){
 function closeEdit(){document.getElementById('editModal').style.display='none'}
 function saveEdit(){
   var id=parseInt(document.getElementById('ed_id').value);
+  var imgVal=document.getElementById('ed_img').value.trim()||null;
+  var urlVal=document.getElementById('ed_url').value.trim()||null;
+  if(imgVal&&imgVal.indexOf('http')!==0)imgVal='https://'+imgVal;
+  if(urlVal&&urlVal.indexOf('http')!==0)urlVal='https://'+urlVal;
   var data={
     title:document.getElementById('ed_title').value.trim(),
     event_date:document.getElementById('ed_date').value.trim()||null,
     location:document.getElementById('ed_loc').value.trim()||'Malta',
     source_name:document.getElementById('ed_source').value.trim()||null,
     category:document.getElementById('ed_cat').value||null,
-    image_url:document.getElementById('ed_img').value.trim()||null,
-    source_url:document.getElementById('ed_url').value.trim()||null,
+    image_url:imgVal,
+    source_url:urlVal,
     description:document.getElementById('ed_desc').value.trim()||null
   };
   if(!data.title)return toast('Title required',1);
@@ -1253,7 +1263,11 @@ app.delete('/admin/api/events/:id', async (req, res) => {
 app.put('/admin/api/events/:id', async (req, res) => {
   if (!authCheck(req, res)) return;
   try {
-    const { title, event_date, location, source_name, category, image_url, source_url, description } = req.body;
+    const { title, event_date, location, source_name, category, description } = req.body;
+    let { image_url, source_url } = req.body;
+    // Auto-fix URLs missing protocol
+    if (source_url && !source_url.startsWith('http') && !source_url.startsWith('manual:')) source_url = 'https://' + source_url;
+    if (image_url && !image_url.startsWith('http')) image_url = 'https://' + image_url;
     await pool.query('ALTER TABLE events ADD COLUMN IF NOT EXISTS source_name TEXT').catch(()=>{});
     await pool.query(
       `UPDATE events SET title=$1, event_date=$2, location=$3, source_name=$4, category=$5, image_url=$6, source_url=$7, description=$8 WHERE id=$9`,
@@ -1290,11 +1304,16 @@ app.put('/admin/api/events/:id/date', (req, res) => {
 app.post('/admin/api/events', async (req, res) => {
   if (!authCheck(req, res)) return;
   try {
-    const { title, event_date, location, image_url, source_url, description, category, source_name } = req.body;
+    const { title, event_date, location, description, category, source_name } = req.body;
+    let { image_url, source_url } = req.body;
     if (!title || !event_date || !location) return res.status(400).json({ error: 'Title, date, and location are required' });
     
+    // Auto-fix URLs missing protocol
+    if (source_url && !source_url.startsWith('http') && !source_url.startsWith('manual:')) source_url = 'https://' + source_url;
+    if (image_url && !image_url.startsWith('http')) image_url = 'https://' + image_url;
+    
     // Ensure source_name column exists
-    await pool.query('ALTER TABLE events ADD COLUMN IF NOT EXISTS source_name TEXT').catch(()=>{});
+    await pool.query('ALTER TABLE events ADD COLUMN IF NOT EXISTS source_name TEXT').catch((e)=>{console.log('ALTER skip:', e.message)});
     
     let result;
     try {
@@ -1302,11 +1321,20 @@ app.post('/admin/api/events', async (req, res) => {
         'INSERT INTO events (title, event_date, location, image_url, source_url, description, category, source_name) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *',
         [title, event_date, location || 'Malta', image_url || null, source_url || 'manual://added', description || null, category || null, source_name || null]
       );
-    } catch (e) {
-      result = await pool.query(
-        'INSERT INTO events (title, event_date, location, image_url, source_url, description, category) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *',
-        [title, event_date, location || 'Malta', image_url || null, source_url || 'manual://added', description || null, category || null]
-      );
+    } catch (e1) {
+      console.log('Insert with source_name failed:', e1.message);
+      try {
+        result = await pool.query(
+          'INSERT INTO events (title, event_date, location, image_url, source_url, description, category) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *',
+          [title, event_date, location || 'Malta', image_url || null, source_url || 'manual://added', description || null, category || null]
+        );
+      } catch (e2) {
+        console.log('Insert without source_name failed:', e2.message);
+        result = await pool.query(
+          'INSERT INTO events (title, event_date, location, image_url, source_url, description) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *',
+          [title, event_date, location || 'Malta', image_url || null, source_url || 'manual://added', description || null]
+        );
+      }
     }
     res.json({ success: true, event: result.rows[0] });
   } catch (e) { res.status(500).json({ error: e.message }); }
