@@ -38,6 +38,7 @@ pool.query(`CREATE TABLE IF NOT EXISTS click_tracking (
 // Ensure columns exist
 pool.query('ALTER TABLE events ADD COLUMN IF NOT EXISTS category TEXT').catch(()=>{});
 pool.query('ALTER TABLE events ADD COLUMN IF NOT EXISTS source_name TEXT').catch(()=>{});
+pool.query('ALTER TABLE events ADD COLUMN IF NOT EXISTS recurring TEXT').catch(()=>{});
 
 // =====================================================================
 // MONTH HELPERS
@@ -202,6 +203,7 @@ const createCard = (event, isPast) => {
     if (!desc || desc === 'null') desc = '';
     const hasRange = event.event_date && (event.event_date.includes(' - ') || /to/i.test(event.event_date));
     const dateInfo = hasRange ? '<div class="date-range-text">📅 ' + event.event_date + '</div>' : '';
+    const recurTag = event.recurring ? '<div class="recurring-tag">🔁 ' + event.recurring + '</div>' : '';
     if (!desc) desc = 'Click details to see more about this event.';
     const loc = event.location && event.location !== 'Malta' ? event.location : '';
     const locHTML = loc ? '<div class="location">📍 ' + loc + '</div>' : '';
@@ -225,6 +227,7 @@ const createCard = (event, isPast) => {
             <div class="title">${title}</div>
             ${locHTML}
             ${dateInfo}
+            ${recurTag}
             <div class="description">${desc}</div>
             <a href="${event.source_url || '#'}" target="_blank" class="btn" onclick="trackClick(${event.id},'${safeTitle}','${source}')">Details</a>
         </div>
@@ -479,6 +482,7 @@ app.get('/', async (req, res) => {
     @media (max-width: 768px) {
       .card-media-link { pointer-events:auto; cursor:pointer; }
     }
+    .recurring-tag { display:inline-block; background:#dbeafe; color:#1d4ed8; font-size:0.75rem; font-weight:600; padding:3px 10px; border-radius:20px; margin-bottom:8px; }
   </style>
 </head>
 <body>
@@ -816,6 +820,7 @@ app.get('/admin', (req, res) => {
           <input type="hidden" id="ed_id">
           <div class="form-group"><label>Title</label><input type="text" id="ed_title"></div>
           <div class="form-group"><label>Date</label><input type="text" id="ed_date" placeholder="e.g. 14 Feb or 20,21 Mar"></div>
+          <div class="form-group"><label>Recurring</label><select id="ed_recur" style="width:100%;padding:10px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:white;font-family:inherit"><option value="">Not recurring</option><option value="Every Monday">Every Monday</option><option value="Every Tuesday">Every Tuesday</option><option value="Every Wednesday">Every Wednesday</option><option value="Every Thursday">Every Thursday</option><option value="Every Friday">Every Friday</option><option value="Every Saturday">Every Saturday</option><option value="Every Sunday">Every Sunday</option><option value="Every Weekday">Every Weekday</option><option value="Every Weekend">Every Weekend</option><option value="Weekly">Weekly</option><option value="Monthly">Monthly</option></select></div>
           <div class="form-group"><label>Location</label><input type="text" id="ed_loc"></div>
           <div class="form-group"><label>Source</label><input type="text" id="ed_source" placeholder="e.g. ShowsHappening, VisitMalta..."></div>
           <div class="form-group"><label>Category</label><select id="ed_cat" style="width:100%;padding:10px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:white;font-family:inherit"><option value="">Select...</option><option value="Music & Concerts">🎵 Music & Concerts</option><option value="Theatre & Shows">🎭 Theatre & Shows</option><option value="Dance">💃 Dance</option><option value="Nightlife & Parties">🎉 Nightlife & Parties</option><option value="Festivals">🎪 Festivals</option><option value="Arts & Culture">🎨 Arts & Culture</option><option value="Sports & Adventure">🏃 Sports & Adventure</option><option value="Food & Drink">🍷 Food & Drink</option><option value="Family">👨‍👩‍👧 Family</option><option value="Religious">⛪ Religious</option><option value="Conference">📋 Conference</option><option value="Other">📌 Other</option></select></div>
@@ -836,6 +841,7 @@ app.get('/admin', (req, res) => {
         <h3>➕ Add New Event</h3>
         <div class="form-group"><label>Event Title <span class="req">*</span></label><input type="text" id="ae_title" placeholder="e.g. Jazz Night at Valletta"></div>
         <div class="form-group"><label>Event Date <span class="req">*</span></label><input type="text" id="ae_date" placeholder="e.g. 14 Feb or 20,21 Mar or Feb to May"><div class="hint">Use formats: 14 Feb · 20,21 Feb · Feb to May · 14 Feb to 28 Mar</div></div>
+        <div class="form-group"><label>Recurring</label><select id="ae_recur" style="width:100%;padding:10px 14px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:white;font-family:inherit;font-size:0.9rem"><option value="">Not recurring (one-time event)</option><option value="Every Monday">Every Monday</option><option value="Every Tuesday">Every Tuesday</option><option value="Every Wednesday">Every Wednesday</option><option value="Every Thursday">Every Thursday</option><option value="Every Friday">Every Friday</option><option value="Every Saturday">Every Saturday</option><option value="Every Sunday">Every Sunday</option><option value="Every Weekday">Every Weekday (Mon-Fri)</option><option value="Every Weekend">Every Weekend (Sat-Sun)</option><option value="Weekly">Weekly</option><option value="Monthly">Monthly</option></select><div class="hint">If this event repeats, select how often</div></div>
         <div class="form-group"><label>Location <span class="req">*</span></label><input type="text" id="ae_loc" placeholder="e.g. Mediterranean Conference Centre, Valletta"></div>
         <div class="form-group"><label>Category <span class="req">*</span></label><select id="ae_cat" style="width:100%;padding:10px 14px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:white;font-family:inherit;font-size:0.9rem"><option value="">Select category...</option><option value="Music & Concerts">🎵 Music & Concerts</option><option value="Theatre & Shows">🎭 Theatre & Shows</option><option value="Dance">💃 Dance</option><option value="Nightlife & Parties">🎉 Nightlife & Parties</option><option value="Festivals">🎪 Festivals</option><option value="Arts & Culture">🎨 Arts & Culture</option><option value="Sports & Adventure">🏃 Sports & Adventure</option><option value="Food & Drink">🍷 Food & Drink</option><option value="Family">👨‍👩‍👧 Family</option><option value="Religious">⛪ Religious</option><option value="Conference">📋 Conference</option><option value="Other">📌 Other</option></select></div>
         <div class="form-group"><label>Image URL</label><input type="text" id="ae_img" placeholder="https://..."><div class="hint">Paste a direct link to the event image (right-click image → Copy image address)</div></div>
@@ -1001,17 +1007,19 @@ function addEvent(){
   if(url&&url.indexOf('http')!==0)url='https://'+url;
   if(!src)return toast('Source is required',1);
   if(!url)return toast('Event URL is required',1);
+  var recur=document.getElementById('ae_recur').value||null;
   var desc=document.getElementById('ae_desc').value.trim()||null;
   if(!title)return toast('Title is required',1);
   if(!date)return toast('Date is required',1);
   if(!loc)return toast('Location is required',1);
   if(!cat)return toast('Category is required',1);
   var sourceUrl=url||'manual://added';
-  api('POST','/admin/api/events',{title:title,event_date:date,location:loc,category:cat,image_url:img,source_url:sourceUrl,description:desc,source_name:src},function(d){
+  api('POST','/admin/api/events',{title:title,event_date:date,location:loc,category:cat,image_url:img,source_url:sourceUrl,description:desc,source_name:src,recurring:recur},function(d){
     E.push(d.event);us();toast('Event added! \\u2713');
     ['ae_title','ae_date','ae_loc','ae_img','ae_url','ae_desc'].forEach(function(id){document.getElementById(id).value=''});
     document.getElementById('ae_cat').value='';
     document.getElementById('ae_source').value='';
+    document.getElementById('ae_recur').value='';
   });
 }
 function loadAnalytics(){
@@ -1144,6 +1152,7 @@ function openEdit(id){
   document.getElementById('ed_img').value=e.image_url||'';
   document.getElementById('ed_url').value=e.source_url||'';
   document.getElementById('ed_desc').value=e.description||'';
+  document.getElementById('ed_recur').value=e.recurring||'';
   document.getElementById('editModal').style.display='block';
 }
 function closeEdit(){document.getElementById('editModal').style.display='none'}
@@ -1161,7 +1170,8 @@ function saveEdit(){
     category:document.getElementById('ed_cat').value||null,
     image_url:imgVal,
     source_url:urlVal,
-    description:document.getElementById('ed_desc').value.trim()||null
+    description:document.getElementById('ed_desc').value.trim()||null,
+    recurring:document.getElementById('ed_recur').value||null
   };
   if(!data.title)return toast('Title required',1);
   api('PUT','/admin/api/events/'+id,data,function(){
@@ -1207,11 +1217,16 @@ app.get('/admin/api/events', async (req, res) => {
     // Try with category column first, fallback without it
     let result;
     try {
-      result = await pool.query('SELECT id, title, source_url, image_url, event_date, location, description, category, source_name FROM events ORDER BY title');
+      result = await pool.query('SELECT id, title, source_url, image_url, event_date, location, description, category, source_name, recurring FROM events ORDER BY title');
     } catch (e) {
-      // source_name or category column might not exist yet
-      result = await pool.query('SELECT id, title, source_url, image_url, event_date, location, description FROM events ORDER BY title');
-      result.rows = result.rows.map(r => ({ ...r, category: null, source_name: null }));
+      // columns might not exist yet
+      try {
+        result = await pool.query('SELECT id, title, source_url, image_url, event_date, location, description, category, source_name FROM events ORDER BY title');
+        result.rows = result.rows.map(r => ({ ...r, recurring: null }));
+      } catch (e2) {
+        result = await pool.query('SELECT id, title, source_url, image_url, event_date, location, description FROM events ORDER BY title');
+        result.rows = result.rows.map(r => ({ ...r, category: null, source_name: null, recurring: null }));
+      }
     }
     res.json(result.rows);
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -1263,15 +1278,16 @@ app.delete('/admin/api/events/:id', async (req, res) => {
 app.put('/admin/api/events/:id', async (req, res) => {
   if (!authCheck(req, res)) return;
   try {
-    const { title, event_date, location, source_name, category, description } = req.body;
+    const { title, event_date, location, source_name, category, description, recurring } = req.body;
     let { image_url, source_url } = req.body;
     // Auto-fix URLs missing protocol
     if (source_url && !source_url.startsWith('http') && !source_url.startsWith('manual:')) source_url = 'https://' + source_url;
     if (image_url && !image_url.startsWith('http')) image_url = 'https://' + image_url;
     await pool.query('ALTER TABLE events ADD COLUMN IF NOT EXISTS source_name TEXT').catch(()=>{});
+    await pool.query('ALTER TABLE events ADD COLUMN IF NOT EXISTS recurring TEXT').catch(()=>{});
     await pool.query(
-      `UPDATE events SET title=$1, event_date=$2, location=$3, source_name=$4, category=$5, image_url=$6, source_url=$7, description=$8 WHERE id=$9`,
-      [title, event_date, location, source_name, category, image_url, source_url, description, req.params.id]
+      `UPDATE events SET title=$1, event_date=$2, location=$3, source_name=$4, category=$5, image_url=$6, source_url=$7, description=$8, recurring=$9 WHERE id=$10`,
+      [title, event_date, location, source_name, category, image_url, source_url, description, recurring || null, req.params.id]
     );
     // Also update overrides
     const evt = await pool.query('SELECT source_url FROM events WHERE id = $1', [req.params.id]);
@@ -1304,7 +1320,7 @@ app.put('/admin/api/events/:id/date', (req, res) => {
 app.post('/admin/api/events', async (req, res) => {
   if (!authCheck(req, res)) return;
   try {
-    const { title, event_date, location, description, category, source_name } = req.body;
+    const { title, event_date, location, description, category, source_name, recurring } = req.body;
     let { image_url, source_url } = req.body;
     if (!title || !event_date || !location) return res.status(400).json({ error: 'Title, date, and location are required' });
     
@@ -1321,18 +1337,18 @@ app.post('/admin/api/events', async (req, res) => {
     let result;
     try {
       result = await pool.query(
-        'INSERT INTO events (title, event_date, location, image_url, source_url, description, category, source_name) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *',
-        [title, event_date, location || 'Malta', image_url || null, source_url || 'manual://added', description || null, category || null, source_name || null]
+        'INSERT INTO events (title, event_date, location, image_url, source_url, description, category, source_name, recurring) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *',
+        [title, event_date, location || 'Malta', image_url || null, source_url || 'manual://added', description || null, category || null, source_name || null, recurring || null]
       );
     } catch (e1) {
-      console.log('Insert with source_name failed:', e1.message);
+      console.log('Insert with recurring failed:', e1.message);
       try {
         result = await pool.query(
-          'INSERT INTO events (title, event_date, location, image_url, source_url, description, category) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *',
-          [title, event_date, location || 'Malta', image_url || null, source_url || 'manual://added', description || null, category || null]
+          'INSERT INTO events (title, event_date, location, image_url, source_url, description, category, source_name) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *',
+          [title, event_date, location || 'Malta', image_url || null, source_url || 'manual://added', description || null, category || null, source_name || null]
         );
       } catch (e2) {
-        console.log('Insert without source_name failed:', e2.message);
+        console.log('Insert fallback failed:', e2.message);
         result = await pool.query(
           'INSERT INTO events (title, event_date, location, image_url, source_url, description) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *',
           [title, event_date, location || 'Malta', image_url || null, source_url || 'manual://added', description || null]
