@@ -228,7 +228,34 @@ async function scrapeVisitMalta() {
       const locationData = event.field_event_location?.[0];
       const location = locationData?.addr_autocomplete || locationData?.name || 'Malta';
 
-      const category = event.field_event_category?.[0]?.name || null;
+      const rawCategory = event.field_event_category?.[0]?.name || null;
+      // Map VisitMalta categories to our standard set
+      const catMap = {
+        'music': 'Music & Concerts', 'concerts': 'Music & Concerts', 'classical music': 'Music & Concerts',
+        'pop/rock': 'Music & Concerts', 'jazz': 'Music & Concerts', 'opera': 'Music & Concerts',
+        'theatre': 'Theatre & Shows', 'comedy': 'Theatre & Shows', 'performing arts': 'Theatre & Shows',
+        'dance': 'Dance', 'ballet': 'Dance',
+        'nightlife': 'Nightlife & Parties', 'parties': 'Nightlife & Parties',
+        'festival': 'Festivals', 'festivals': 'Festivals', 'carnival': 'Festivals', 'feast': 'Festivals',
+        'art': 'Arts & Culture', 'exhibition': 'Arts & Culture', 'exhibitions': 'Arts & Culture',
+        'culture': 'Arts & Culture', 'heritage': 'Arts & Culture', 'film': 'Arts & Culture', 'visual arts': 'Arts & Culture',
+        'sport': 'Sports & Adventure', 'sports': 'Sports & Adventure', 'outdoor': 'Sports & Adventure',
+        'food': 'Food & Drink', 'food & drink': 'Food & Drink', 'wine': 'Food & Drink', 'gastronomy': 'Food & Drink',
+        'family': 'Family', 'kids': 'Family', 'children': 'Family',
+        'religious': 'Religious', 'religion': 'Religious',
+        'conference': 'Conference', 'seminar': 'Conference', 'workshop': 'Conference',
+      };
+      let category = null;
+      if (rawCategory) {
+        const key = rawCategory.toLowerCase().trim();
+        category = catMap[key];
+        if (!category) {
+          for (const [k, v] of Object.entries(catMap)) {
+            if (key.includes(k)) { category = v; break; }
+          }
+        }
+        if (!category) category = 'Other';
+      }
       const bookingLink = event.field_booking_link?.[0]?.value || null;
       const website = event.field_event_website?.[0]?.value || null;
 

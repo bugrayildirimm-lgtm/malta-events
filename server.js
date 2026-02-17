@@ -209,11 +209,13 @@ const createCard = (event, isPast) => {
 
     return `
     <div class="card event-item ${gray}" data-source="${sourceLower}" data-location="${(event.location||'malta').toLowerCase()}" data-category="${(event.category||'').toLowerCase()}">
+        <a href="${event.source_url || '#'}" target="_blank" class="card-media-link" onclick="trackClick(${event.id},'${safeTitle}','${source}')">
         <div class="card-media">
             ${dateHTML} ${expired}
             <div class="fallback" style="background: ${bgStyle}; position:absolute;top:0;left:0;z-index:1;">${firstLetter}</div>
             ${hasImg ? '<img src="' + event.image_url + '" class="card-img" style="position:relative;z-index:2;" onerror="this.hidden=1">' : ''}
         </div>
+        </a>
         <div class="card-content">
             <div class="source-tag">${source}</div>
             <div class="title">${title}</div>
@@ -338,7 +340,8 @@ app.get('/', async (req, res) => {
     const monthOptions = Array.from(monthSet).map(m => '<option value="' + m.toLowerCase() + '">' + m + '</option>').join('');
 
     const sourceOptions = Array.from(sources).map(s => '<option value="' + s.toLowerCase().replace(/\s+/g,'') + '">' + s + '</option>').join('');
-    const categoryOptions = Array.from(categories).sort().map(c => '<option value="' + c.toLowerCase() + '">' + c + '</option>').join('');
+    const standardCategories = ['Music & Concerts','Theatre & Shows','Dance','Nightlife & Parties','Festivals','Arts & Culture','Sports & Adventure','Food & Drink','Family','Religious','Conference','Other'];
+    const categoryOptions = standardCategories.filter(c => categories.has(c)).map(c => '<option value="' + c.toLowerCase() + '">' + c + '</option>').join('');
 
     const html = `<!DOCTYPE html>
 <html lang="en">
@@ -466,6 +469,12 @@ app.get('/', async (req, res) => {
     .btn:hover { background:var(--primary); box-shadow:0 8px 20px rgba(255,56,92,0.3); transform:translateY(-2px); }
     .hidden { display:none; }
     .event-count { text-align:center; color:#94a3b8; font-size:0.9rem; margin-bottom:20px; }
+
+    /* Photo link - hidden on desktop, clickable on mobile */
+    .card-media-link { display:contents; pointer-events:none; text-decoration:none; }
+    @media (max-width: 768px) {
+      .card-media-link { pointer-events:auto; cursor:pointer; }
+    }
   </style>
 </head>
 <body>
