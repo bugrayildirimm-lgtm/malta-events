@@ -41,6 +41,13 @@ pool.query('ALTER TABLE events ADD COLUMN IF NOT EXISTS source_name TEXT').catch
 pool.query('ALTER TABLE events ADD COLUMN IF NOT EXISTS recurring TEXT').catch(()=>{});
 pool.query('ALTER TABLE events ADD COLUMN IF NOT EXISTS slug TEXT').catch(()=>{});
 
+pool.query(`CREATE TABLE IF NOT EXISTS email_subscribers (
+  id SERIAL PRIMARY KEY,
+  email TEXT UNIQUE NOT NULL,
+  subscribed_at TIMESTAMP DEFAULT NOW(),
+  source TEXT DEFAULT 'website'
+)`).catch(()=>{});
+
 // Generate URL-friendly slug from title
 function generateSlug(title) {
   if (!title) return 'event-' + Date.now();
@@ -690,6 +697,36 @@ app.get('/', async (req, res) => {
     }
   </script>
 
+  <div style="max-width:600px;margin:50px auto 0;padding:0 20px">
+    <div style="background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);border-radius:20px;padding:35px;text-align:center;color:white">
+      <div style="font-size:2rem;margin-bottom:5px">📬</div>
+      <h2 style="margin:0 0 8px;font-size:1.3rem;font-weight:800">Never Miss an Event in Malta</h2>
+      <p style="color:#94a3b8;font-size:0.9rem;margin:0 0 20px">Get weekly updates on the best events, festivals & things to do in Malta and Gozo.</p>
+      <div style="display:flex;gap:8px;max-width:420px;margin:0 auto" id="emailForm">
+        <input type="email" id="subEmail" placeholder="Your email address" style="flex:1;padding:12px 16px;border-radius:12px;border:2px solid #334155;background:#1e293b;color:white;font-family:inherit;font-size:0.9rem;outline:none" onfocus="this.style.borderColor='#FF385C'" onblur="this.style.borderColor='#334155'">
+        <button onclick="subscribeEmail()" style="padding:12px 24px;border-radius:12px;border:none;background:#FF385C;color:white;font-family:inherit;font-weight:700;font-size:0.9rem;cursor:pointer;white-space:nowrap;transition:0.2s" onmouseover="this.style.background='#e11d48'" onmouseout="this.style.background='#FF385C'">Subscribe</button>
+      </div>
+      <div id="subMsg" style="margin-top:10px;font-size:0.85rem;display:none"></div>
+      <p style="color:#475569;font-size:0.7rem;margin:15px 0 0">No spam, unsubscribe anytime. We respect your privacy.</p>
+    </div>
+  </div>
+
+  <script>
+    function subscribeEmail(){
+      var email=document.getElementById('subEmail').value.trim();
+      var msg=document.getElementById('subMsg');
+      if(!email||email.indexOf('@')===-1){msg.style.display='block';msg.style.color='#f87171';msg.textContent='Please enter a valid email';return}
+      fetch('/api/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:email})})
+        .then(function(r){return r.json()})
+        .then(function(d){
+          msg.style.display='block';
+          if(d.ok){msg.style.color='#4ade80';msg.textContent='You\\'re subscribed! 🎉';document.getElementById('subEmail').value=''}
+          else{msg.style.color='#f87171';msg.textContent='Something went wrong, try again'}
+        }).catch(function(){msg.style.display='block';msg.style.color='#f87171';msg.textContent='Something went wrong, try again'});
+    }
+    document.getElementById('subEmail').addEventListener('keypress',function(e){if(e.key==='Enter')subscribeEmail()});
+  </script>
+
   <footer style="margin-top:60px;padding:40px 20px;background:#1e293b;color:#94a3b8;text-align:center;font-size:0.85rem;line-height:1.8">
     <div style="max-width:800px;margin:0 auto">
       <h2 style="color:white;font-size:1.2rem;margin:0 0 10px">Malta Event Guide</h2>
@@ -950,6 +987,19 @@ app.post('/api/track', async (req, res) => {
   } catch (e) { res.json({ ok: false }); }
 });
 
+// Email subscribe (public)
+app.post('/api/subscribe', async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email || !email.includes('@') || !email.includes('.')) return res.status(400).json({ error: 'Invalid email' });
+    await pool.query(
+      'INSERT INTO email_subscribers (email) VALUES ($1) ON CONFLICT (email) DO NOTHING',
+      [email.toLowerCase().trim()]
+    );
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: 'Failed to subscribe' }); }
+});
+
 
 // =====================================================================
 // ADMIN PAGE
@@ -1194,6 +1244,8 @@ app.get('/admin', (req, res) => {
         <div class="stat-cards" id="statCards">Loading...</div>
         <h3 style="margin-top:20px">Top Clicked Events</h3>
         <table class="click-table" id="clickTable"><thead><tr><th>Event</th><th>Source</th><th>Clicks</th></tr></thead><tbody id="clickBody"><tr><td colspan="3" style="color:#64748b">Loading...</td></tr></tbody></table>
+        <h3 style="margin-top:30px">📬 Email Subscribers (<span id="subCount">0</span>)</h3>
+        <div id="subList" style="background:#1e293b;border-radius:10px;padding:15px;max-height:300px;overflow-y:auto;font-size:0.85rem;color:#94a3b8">Loading...</div>
       </div>
     </div>
   </div>
@@ -1369,6 +1421,16 @@ function loadAnalytics(){
       document.getElementById('clickBody').innerHTML=d.top_events.map(function(e){
         return '<tr><td>'+e.event_title+'<\\/td><td>'+e.source+'<\\/td><td><strong>'+e.clicks+'<\\/strong><\\/td><\\/tr>';
       }).join('')||'<tr><td colspan="3" style="color:#64748b">No clicks yet<\\/td><\\/tr>';
+    }).catch(function(){});
+  fetch('/admin/api/subscribers',{headers:{Authorization:auth}})
+    .then(function(r){return r.json()})
+    .then(function(subs){
+      document.getElementById('subCount').textContent=subs.length;
+      if(subs.length===0){document.getElementById('subList').innerHTML='<div style="color:#64748b">No subscribers yet</div>';return}
+      document.getElementById('subList').innerHTML=subs.map(function(s){
+        var d=new Date(s.subscribed_at);
+        return '<div style="padding:6px 0;border-bottom:1px solid #334155;display:flex;justify-content:space-between"><span>'+s.email+'</span><span style="color:#64748b;font-size:0.75rem">'+d.toLocaleDateString()+'</span></div>';
+      }).join('');
     }).catch(function(){});
 }
 // MANAGE TAB
@@ -1711,6 +1773,14 @@ app.get('/admin/api/analytics', async (req, res) => {
       top_events: top.rows
     });
   } catch (e) { res.json({ total_clicks: 0, today_clicks: 0, week_clicks: 0, unique_events: 0, top_events: [] }); }
+});
+
+app.get('/admin/api/subscribers', async (req, res) => {
+  if (!authCheck(req, res)) return;
+  try {
+    const result = await pool.query('SELECT email, subscribed_at FROM email_subscribers ORDER BY subscribed_at DESC');
+    res.json(result.rows);
+  } catch (e) { res.json([]); }
 });
 
 app.listen(3000, () => console.log('Server running at http://localhost:3000'));
