@@ -743,6 +743,20 @@ app.get('/', async (req, res) => {
       if(window.scrollY>600){btn.style.display='flex'}else{btn.style.display='none'}
     });
   </script>
+
+  <div id="cookieBanner" style="display:none;position:fixed;bottom:0;left:0;right:0;background:#0f172a;color:#e2e8f0;padding:16px 24px;z-index:9999;box-shadow:0 -4px 20px rgba(0,0,0,0.3)">
+    <div style="max-width:1000px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap">
+      <p style="margin:0;font-size:0.85rem;line-height:1.5;flex:1;min-width:250px">🍪 We use cookies to improve your experience. By continuing to browse, you agree to our use of cookies.</p>
+      <div style="display:flex;gap:10px">
+        <button onclick="acceptCookies()" style="padding:10px 24px;border-radius:10px;border:none;background:#FF385C;color:white;font-family:inherit;font-weight:700;font-size:0.85rem;cursor:pointer;transition:0.2s" onmouseover="this.style.background='#e11d48'" onmouseout="this.style.background='#FF385C'">Accept</button>
+        <button onclick="acceptCookies()" style="padding:10px 16px;border-radius:10px;border:1px solid #475569;background:transparent;color:#94a3b8;font-family:inherit;font-size:0.85rem;cursor:pointer">Dismiss</button>
+      </div>
+    </div>
+  </div>
+  <script>
+    function acceptCookies(){document.getElementById('cookieBanner').style.display='none';try{localStorage.setItem('cookiesAccepted','1')}catch(e){}}
+    try{if(!localStorage.getItem('cookiesAccepted')){document.getElementById('cookieBanner').style.display='block'}}catch(e){}
+  </script>
 </body>
 </html>`;
     res.send(html);
@@ -992,6 +1006,20 @@ app.get('/event/:slug', async (req, res) => {
     <a href="/">Malta Event Guide</a> — Your complete guide to events in Malta & Gozo<br>
     &copy; ${new Date().getFullYear()} maltaeventguide.com · Powered by <a href="https://bugrayildirim.me/" target="_blank">Bugra</a> · <a href="mailto:hello@bugrayildirim.me">hello@bugrayildirim.me</a>
   </div>
+
+  <div id="cookieBanner" style="display:none;position:fixed;bottom:0;left:0;right:0;background:#0f172a;color:#e2e8f0;padding:16px 24px;z-index:9999;box-shadow:0 -4px 20px rgba(0,0,0,0.3)">
+    <div style="max-width:1000px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap">
+      <p style="margin:0;font-size:0.85rem;line-height:1.5;flex:1;min-width:250px">🍪 We use cookies to improve your experience. By continuing to browse, you agree to our use of cookies.</p>
+      <div style="display:flex;gap:10px">
+        <button onclick="acceptCookies()" style="padding:10px 24px;border-radius:10px;border:none;background:#FF385C;color:white;font-family:inherit;font-weight:700;font-size:0.85rem;cursor:pointer;transition:0.2s" onmouseover="this.style.background='#e11d48'" onmouseout="this.style.background='#FF385C'">Accept</button>
+        <button onclick="acceptCookies()" style="padding:10px 16px;border-radius:10px;border:1px solid #475569;background:transparent;color:#94a3b8;font-family:inherit;font-size:0.85rem;cursor:pointer">Dismiss</button>
+      </div>
+    </div>
+  </div>
+  <script>
+    function acceptCookies(){document.getElementById('cookieBanner').style.display='none';try{localStorage.setItem('cookiesAccepted','1')}catch(e){}}
+    try{if(!localStorage.getItem('cookiesAccepted')){document.getElementById('cookieBanner').style.display='block'}}catch(e){}
+  </script>
 </body>
 </html>`;
     res.send(html);
