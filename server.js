@@ -959,6 +959,35 @@ app.get('/event/:slug', async (req, res) => {
     </div>
   </div>` : ''}
 
+  <div style="max-width:600px;margin:40px auto 0;padding:0 20px">
+    <div style="background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);border-radius:20px;padding:35px;text-align:center;color:white">
+      <div style="font-size:2rem;margin-bottom:5px">📬</div>
+      <h2 style="margin:0 0 8px;font-size:1.3rem;font-weight:800">Never Miss an Event in Malta</h2>
+      <p style="color:#94a3b8;font-size:0.9rem;margin:0 0 20px">Get weekly updates on the best events, festivals & things to do in Malta and Gozo.</p>
+      <div style="display:flex;gap:8px;max-width:420px;margin:0 auto">
+        <input type="email" id="subEmail" placeholder="Your email address" style="flex:1;padding:12px 16px;border-radius:12px;border:2px solid #334155;background:#1e293b;color:white;font-family:inherit;font-size:0.9rem;outline:none" onfocus="this.style.borderColor='#FF385C'" onblur="this.style.borderColor='#334155'">
+        <button onclick="subscribeEmail()" style="padding:12px 24px;border-radius:12px;border:none;background:#FF385C;color:white;font-family:inherit;font-weight:700;font-size:0.9rem;cursor:pointer;white-space:nowrap;transition:0.2s" onmouseover="this.style.background='#e11d48'" onmouseout="this.style.background='#FF385C'">Subscribe</button>
+      </div>
+      <div id="subMsg" style="margin-top:10px;font-size:0.85rem;display:none"></div>
+      <p style="color:#475569;font-size:0.7rem;margin:15px 0 0">No spam, unsubscribe anytime. We respect your privacy.</p>
+    </div>
+  </div>
+  <script>
+    function subscribeEmail(){
+      var email=document.getElementById('subEmail').value.trim();
+      var msg=document.getElementById('subMsg');
+      if(!email||email.indexOf('@')===-1){msg.style.display='block';msg.style.color='#f87171';msg.textContent='Please enter a valid email';return}
+      fetch('/api/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:email})})
+        .then(function(r){return r.json()})
+        .then(function(d){
+          msg.style.display='block';
+          if(d.ok){msg.style.color='#4ade80';msg.textContent='You\\'re subscribed! 🎉';document.getElementById('subEmail').value=''}
+          else{msg.style.color='#f87171';msg.textContent='Something went wrong, try again'}
+        }).catch(function(){msg.style.display='block';msg.style.color='#f87171';msg.textContent='Something went wrong, try again'});
+    }
+    document.getElementById('subEmail').addEventListener('keypress',function(e){if(e.key==='Enter')subscribeEmail()});
+  </script>
+
   <div class="footer">
     <a href="/">Malta Event Guide</a> — Your complete guide to events in Malta & Gozo<br>
     &copy; ${new Date().getFullYear()} maltaeventguide.com · Powered by <a href="https://bugrayildirim.me/" target="_blank">Bugra</a> · <a href="mailto:hello@bugrayildirim.me">hello@bugrayildirim.me</a>
