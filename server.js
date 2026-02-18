@@ -680,12 +680,18 @@ app.get('/', async (req, res) => {
         var recur = (card.getAttribute('data-recurring')||'').toLowerCase();
         var match = false;
         
+        // Is this a date range (ongoing) event?
+        var isRange = sd && ed && sd!==ed;
+        
+        // Helper: exact date match (single-day event)
+        function exactMatch(targetStr){
+          return sd===targetStr;
+        }
+        
         // Helper: check if a target date falls within start-end range
         function inRange(targetStr){
           if(sd===targetStr) return true;
-          if(sd && ed && sd!==ed){
-            return targetStr >= sd && targetStr <= ed;
-          }
+          if(isRange) return targetStr >= sd && targetStr <= ed;
           return false;
         }
         
@@ -701,15 +707,20 @@ app.get('/', async (req, res) => {
         }
         
         if(mode==='today'){
-          match = inRange(todayStr) || recurMatch(today);
+          // Single-day: exact match. Range: only if has recurring tag matching today
+          match = exactMatch(todayStr) || recurMatch(today);
+          if(!match && isRange && recur && inRange(todayStr)) match = recurMatch(today);
         } else if(mode==='tomorrow'){
-          match = inRange(tomorrowStr) || recurMatch(tomorrow);
+          match = exactMatch(tomorrowStr) || recurMatch(tomorrow);
+          if(!match && isRange && recur && inRange(tomorrowStr)) match = recurMatch(tomorrow);
         } else if(mode==='weekend'){
+          // Weekend: show range events too (likely happening at some point)
           for(var w=0;w<weekendDates.length;w++){
             if(inRange(weekendDates[w])){ match=true; break; }
           }
           if(!match) match = recur.indexOf('friday')!==-1||recur.indexOf('saturday')!==-1||recur.indexOf('sunday')!==-1||recur==='every weekend';
         } else if(mode==='week'){
+          // This week: show range events too
           for(var w=0;w<weekDates.length;w++){
             if(inRange(weekDates[w])){ match=true; break; }
           }
@@ -728,9 +739,9 @@ app.get('/', async (req, res) => {
       <div style="font-size:2rem;margin-bottom:5px">📬</div>
       <h2 style="margin:0 0 8px;font-size:1.3rem;font-weight:800">Never Miss an Event in Malta</h2>
       <p style="color:#94a3b8;font-size:0.9rem;margin:0 0 20px">Get weekly updates on the best events, festivals & things to do in Malta and Gozo.</p>
-      <div style="display:flex;gap:8px;max-width:420px;margin:0 auto" id="emailForm">
-        <input type="email" id="subEmail" placeholder="Your email address" style="flex:1;padding:12px 16px;border-radius:12px;border:2px solid #334155;background:#1e293b;color:white;font-family:inherit;font-size:0.9rem;outline:none" onfocus="this.style.borderColor='#FF385C'" onblur="this.style.borderColor='#334155'">
-        <button onclick="subscribeEmail()" style="padding:12px 24px;border-radius:12px;border:none;background:#FF385C;color:white;font-family:inherit;font-weight:700;font-size:0.9rem;cursor:pointer;white-space:nowrap;transition:0.2s" onmouseover="this.style.background='#e11d48'" onmouseout="this.style.background='#FF385C'">Subscribe</button>
+      <div style="display:flex;gap:8px;max-width:420px;margin:0 auto;flex-wrap:wrap" id="emailForm">
+        <input type="email" id="subEmail" placeholder="Your email address" style="flex:1;min-width:200px;padding:12px 16px;border-radius:12px;border:2px solid #334155;background:#1e293b;color:white;font-family:inherit;font-size:0.9rem;outline:none" onfocus="this.style.borderColor='#FF385C'" onblur="this.style.borderColor='#334155'">
+        <button onclick="subscribeEmail()" style="padding:12px 24px;border-radius:12px;border:none;background:#FF385C;color:white;font-family:inherit;font-weight:700;font-size:0.9rem;cursor:pointer;white-space:nowrap;transition:0.2s;flex-shrink:0" onmouseover="this.style.background='#e11d48'" onmouseout="this.style.background='#FF385C'">Subscribe</button>
       </div>
       <div id="subMsg" style="margin-top:10px;font-size:0.85rem;display:none"></div>
       <p style="color:#475569;font-size:0.7rem;margin:15px 0 0">No spam, unsubscribe anytime. We respect your privacy.</p>
@@ -1004,9 +1015,9 @@ app.get('/event/:slug', async (req, res) => {
       <div style="font-size:2rem;margin-bottom:5px">📬</div>
       <h2 style="margin:0 0 8px;font-size:1.3rem;font-weight:800">Never Miss an Event in Malta</h2>
       <p style="color:#94a3b8;font-size:0.9rem;margin:0 0 20px">Get weekly updates on the best events, festivals & things to do in Malta and Gozo.</p>
-      <div style="display:flex;gap:8px;max-width:420px;margin:0 auto">
-        <input type="email" id="subEmail" placeholder="Your email address" style="flex:1;padding:12px 16px;border-radius:12px;border:2px solid #334155;background:#1e293b;color:white;font-family:inherit;font-size:0.9rem;outline:none" onfocus="this.style.borderColor='#FF385C'" onblur="this.style.borderColor='#334155'">
-        <button onclick="subscribeEmail()" style="padding:12px 24px;border-radius:12px;border:none;background:#FF385C;color:white;font-family:inherit;font-weight:700;font-size:0.9rem;cursor:pointer;white-space:nowrap;transition:0.2s" onmouseover="this.style.background='#e11d48'" onmouseout="this.style.background='#FF385C'">Subscribe</button>
+      <div style="display:flex;gap:8px;max-width:420px;margin:0 auto;flex-wrap:wrap">
+        <input type="email" id="subEmail" placeholder="Your email address" style="flex:1;min-width:200px;padding:12px 16px;border-radius:12px;border:2px solid #334155;background:#1e293b;color:white;font-family:inherit;font-size:0.9rem;outline:none" onfocus="this.style.borderColor='#FF385C'" onblur="this.style.borderColor='#334155'">
+        <button onclick="subscribeEmail()" style="padding:12px 24px;border-radius:12px;border:none;background:#FF385C;color:white;font-family:inherit;font-weight:700;font-size:0.9rem;cursor:pointer;white-space:nowrap;transition:0.2s;flex-shrink:0" onmouseover="this.style.background='#e11d48'" onmouseout="this.style.background='#FF385C'">Subscribe</button>
       </div>
       <div id="subMsg" style="margin-top:10px;font-size:0.85rem;display:none"></div>
       <p style="color:#475569;font-size:0.7rem;margin:15px 0 0">No spam, unsubscribe anytime. We respect your privacy.</p>
@@ -1325,10 +1336,39 @@ app.get('/admin', (req, res) => {
       <div class="analytics">
         <h3>📊 Click Analytics</h3>
         <div class="stat-cards" id="statCards">Loading...</div>
-        <h3 style="margin-top:20px">Top Clicked Events</h3>
-        <table class="click-table" id="clickTable"><thead><tr><th>Event</th><th>Source</th><th>Clicks</th></tr></thead><tbody id="clickBody"><tr><td colspan="3" style="color:#64748b">Loading...</td></tr></tbody></table>
-        <h3 style="margin-top:30px">📬 Email Subscribers (<span id="subCount">0</span>)</h3>
-        <div id="subList" style="background:#1e293b;border-radius:10px;padding:15px;max-height:300px;overflow-y:auto;font-size:0.85rem;color:#94a3b8">Loading...</div>
+        
+        <div style="margin-top:25px">
+          <div onclick="toggleSection('clickSection')" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;background:#1e293b;padding:12px 18px;border-radius:10px;margin-bottom:2px">
+            <h3 style="margin:0;font-size:1rem">🔗 Top Clicked Events</h3>
+            <span id="clickArrow" style="color:#64748b;font-size:1.2rem">▼</span>
+          </div>
+          <div id="clickSection" style="background:#1e293b;border-radius:0 0 10px 10px;padding:15px;margin-bottom:20px">
+            <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+              <input type="text" id="clickSearch" placeholder="Search events..." oninput="filterClicks()" style="flex:1;min-width:150px;padding:8px 12px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:white;font-family:inherit;font-size:0.85rem">
+              <select id="clickSource" onchange="filterClicks()" style="padding:8px 12px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:white;font-family:inherit;font-size:0.85rem">
+                <option value="">All Sources</option>
+              </select>
+              <select id="clickPeriod" onchange="filterClicks()" style="padding:8px 12px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:white;font-family:inherit;font-size:0.85rem">
+                <option value="all">All Time</option>
+                <option value="today">Today</option>
+                <option value="week">This Week</option>
+                <option value="month">This Month</option>
+              </select>
+            </div>
+            <div style="font-size:0.75rem;color:#64748b;margin-bottom:8px" id="clickFilterCount"></div>
+            <table class="click-table" id="clickTable"><thead><tr><th>Event</th><th>Source</th><th>Clicks</th></tr></thead><tbody id="clickBody"><tr><td colspan="3" style="color:#64748b">Loading...</td></tr></tbody></table>
+          </div>
+        </div>
+
+        <div>
+          <div onclick="toggleSection('subSection')" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;background:#1e293b;padding:12px 18px;border-radius:10px;margin-bottom:2px">
+            <h3 style="margin:0;font-size:1rem">📬 Email Subscribers (<span id="subCount">0</span>)</h3>
+            <span id="subArrow" style="color:#64748b;font-size:1.2rem">▼</span>
+          </div>
+          <div id="subSection" style="background:#1e293b;border-radius:0 0 10px 10px;padding:15px;max-height:400px;overflow-y:auto">
+            <div id="subList" style="font-size:0.85rem;color:#94a3b8">Loading...</div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -1492,6 +1532,38 @@ function addEvent(){
     document.getElementById('ae_recur').value='';
   });
 }
+var allClicks=[];
+function toggleSection(id){
+  var el=document.getElementById(id);
+  var arrow=document.getElementById(id.replace('Section','Arrow'));
+  if(el.style.display==='none'){el.style.display='block';if(arrow)arrow.textContent='▼'}
+  else{el.style.display='none';if(arrow)arrow.textContent='▶'}
+}
+function filterClicks(){
+  var q=(document.getElementById('clickSearch').value||'').toLowerCase();
+  var src=document.getElementById('clickSource').value;
+  var period=document.getElementById('clickPeriod').value;
+  var now=new Date();
+  var filtered=allClicks.filter(function(e){
+    if(q&&(e.event_title||'').toLowerCase().indexOf(q)<0)return false;
+    if(src&&e.source!==src)return false;
+    if(period!=='all'&&e.last_click){
+      var d=new Date(e.last_click);
+      var diffDays=(now-d)/(1000*60*60*24);
+      if(period==='today'&&diffDays>1)return false;
+      if(period==='week'&&diffDays>7)return false;
+      if(period==='month'&&diffDays>30)return false;
+    }
+    return true;
+  });
+  var totalFiltered=0;
+  var html=filtered.map(function(e){
+    totalFiltered+=parseInt(e.clicks);
+    return '<tr><td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(e.event_title)+'<\\/td><td>'+esc(e.source)+'<\\/td><td><strong>'+e.clicks+'<\\/strong><\\/td><\\/tr>';
+  }).join('');
+  document.getElementById('clickBody').innerHTML=html||'<tr><td colspan="3" style="color:#64748b">No matching clicks<\\/td><\\/tr>';
+  document.getElementById('clickFilterCount').textContent=filtered.length+' events · '+totalFiltered+' total clicks';
+}
 function loadAnalytics(){
   fetch('/admin/api/analytics',{headers:{Authorization:auth}})
     .then(function(r){return r.json()})
@@ -1500,10 +1572,18 @@ function loadAnalytics(){
         '<div class="sc"><div class="num">'+d.total_clicks+'<\\/div><div class="lbl">Total Clicks<\\/div><\\/div>'+
         '<div class="sc"><div class="num">'+d.today_clicks+'<\\/div><div class="lbl">Today<\\/div><\\/div>'+
         '<div class="sc"><div class="num">'+d.week_clicks+'<\\/div><div class="lbl">This Week<\\/div><\\/div>'+
+        '<div class="sc"><div class="num">'+d.month_clicks+'<\\/div><div class="lbl">This Month<\\/div><\\/div>'+
         '<div class="sc"><div class="num">'+d.unique_events+'<\\/div><div class="lbl">Unique Events<\\/div><\\/div>';
-      document.getElementById('clickBody').innerHTML=d.top_events.map(function(e){
-        return '<tr><td>'+e.event_title+'<\\/td><td>'+e.source+'<\\/td><td><strong>'+e.clicks+'<\\/strong><\\/td><\\/tr>';
-      }).join('')||'<tr><td colspan="3" style="color:#64748b">No clicks yet<\\/td><\\/tr>';
+      allClicks=d.top_events||[];
+      // Build source filter dropdown
+      var sources={};
+      allClicks.forEach(function(e){if(e.source)sources[e.source]=(sources[e.source]||0)+parseInt(e.clicks)});
+      var srcSelect=document.getElementById('clickSource');
+      srcSelect.innerHTML='<option value="">All Sources</option>';
+      Object.keys(sources).sort().forEach(function(s){
+        srcSelect.innerHTML+='<option value="'+s+'">'+s+' ('+sources[s]+')</option>';
+      });
+      filterClicks();
     }).catch(function(){});
   fetch('/admin/api/subscribers',{headers:{Authorization:auth}})
     .then(function(r){return r.json()})
@@ -1850,16 +1930,21 @@ app.get('/admin/api/analytics', async (req, res) => {
     const total = await pool.query('SELECT COUNT(*) as c FROM click_tracking');
     const today = await pool.query("SELECT COUNT(*) as c FROM click_tracking WHERE clicked_at >= CURRENT_DATE");
     const week = await pool.query("SELECT COUNT(*) as c FROM click_tracking WHERE clicked_at >= CURRENT_DATE - INTERVAL '7 days'");
+    const month = await pool.query("SELECT COUNT(*) as c FROM click_tracking WHERE clicked_at >= CURRENT_DATE - INTERVAL '30 days'");
     const unique = await pool.query('SELECT COUNT(DISTINCT event_id) as c FROM click_tracking');
-    const top = await pool.query('SELECT event_title, source, COUNT(*) as clicks FROM click_tracking GROUP BY event_title, source ORDER BY clicks DESC LIMIT 20');
+    const top = await pool.query('SELECT event_title, source, COUNT(*) as clicks, MAX(clicked_at) as last_click FROM click_tracking GROUP BY event_title, source ORDER BY clicks DESC LIMIT 100');
+    // Per-source totals
+    const sourceTotals = await pool.query('SELECT source, COUNT(*) as clicks FROM click_tracking GROUP BY source ORDER BY clicks DESC');
     res.json({
       total_clicks: total.rows[0].c,
       today_clicks: today.rows[0].c,
       week_clicks: week.rows[0].c,
+      month_clicks: month.rows[0].c,
       unique_events: unique.rows[0].c,
-      top_events: top.rows
+      top_events: top.rows,
+      source_totals: sourceTotals.rows
     });
-  } catch (e) { res.json({ total_clicks: 0, today_clicks: 0, week_clicks: 0, unique_events: 0, top_events: [] }); }
+  } catch (e) { res.json({ total_clicks: 0, today_clicks: 0, week_clicks: 0, month_clicks: 0, unique_events: 0, top_events: [], source_totals: [] }); }
 });
 
 app.get('/admin/api/subscribers', async (req, res) => {
