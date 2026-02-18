@@ -235,10 +235,12 @@ const createCard = (event, isPast) => {
 
     const slug = event.slug || generateSlug(event.title);
     const startDate = getStartDate(event.event_date);
+    const endDate = getEndDate(event.event_date);
     const startDateStr = startDate ? startDate.toISOString().split('T')[0] : '';
+    const endDateStr = endDate ? endDate.toISOString().split('T')[0] : '';
 
     return `
-    <div class="card event-item ${gray}" data-source="${sourceLower}" data-location="${(event.location||'malta').toLowerCase()}" data-category="${(event.category||'').toLowerCase()}" data-startdate="${startDateStr}" data-recurring="${event.recurring||''}">
+    <div class="card event-item ${gray}" data-source="${sourceLower}" data-location="${(event.location||'malta').toLowerCase()}" data-category="${(event.category||'').toLowerCase()}" data-startdate="${startDateStr}" data-enddate="${endDateStr}" data-recurring="${event.recurring||''}">
         <a href="/event/${slug}" class="card-media-link">
         <div class="card-media">
             ${dateHTML} ${expired}
@@ -672,21 +674,45 @@ app.get('/', async (req, res) => {
       var visible = 0;
       cards.forEach(function(card){
         if(card.classList.contains('separator')){ card.classList.add('hidden'); return; }
+        if(card.classList.contains('past-event')){ card.classList.add('hidden'); return; }
         var sd = card.getAttribute('data-startdate')||'';
+        var ed = card.getAttribute('data-enddate')||'';
         var recur = (card.getAttribute('data-recurring')||'').toLowerCase();
         var match = false;
         
+        // Helper: check if a target date falls within start-end range
+        function inRange(targetStr){
+          if(sd===targetStr) return true;
+          if(sd && ed && sd!==ed){
+            return targetStr >= sd && targetStr <= ed;
+          }
+          return false;
+        }
+        
+        // Helper: check recurring match for a given date
+        function recurMatch(dateObj){
+          if(!recur) return false;
+          var dn = dateObj.getDay();
+          if(recur.indexOf(dayNames[dn])!==-1) return true;
+          if(recur==='every weekday'&&dn>=1&&dn<=5) return true;
+          if(recur==='every weekend'&&(dn===0||dn===6)) return true;
+          if(recur==='weekly'||recur==='monthly') return true;
+          return false;
+        }
+        
         if(mode==='today'){
-          match = sd===todayStr;
-          if(!match&&recur){ match = recur.indexOf(dayNames[today.getDay()])!==-1 || (recur==='every weekday'&&today.getDay()>=1&&today.getDay()<=5) || (recur==='every weekend'&&(today.getDay()===0||today.getDay()===6)); }
+          match = inRange(todayStr) || recurMatch(today);
         } else if(mode==='tomorrow'){
-          match = sd===tomorrowStr;
-          if(!match&&recur){ match = recur.indexOf(dayNames[tomorrow.getDay()])!==-1 || (recur==='every weekday'&&tomorrow.getDay()>=1&&tomorrow.getDay()<=5) || (recur==='every weekend'&&(tomorrow.getDay()===0||tomorrow.getDay()===6)); }
+          match = inRange(tomorrowStr) || recurMatch(tomorrow);
         } else if(mode==='weekend'){
-          match = weekendDates.indexOf(sd)!==-1;
-          if(!match&&recur){ match = recur.indexOf('friday')!==-1||recur.indexOf('saturday')!==-1||recur.indexOf('sunday')!==-1||recur==='every weekend'; }
+          for(var w=0;w<weekendDates.length;w++){
+            if(inRange(weekendDates[w])){ match=true; break; }
+          }
+          if(!match) match = recur.indexOf('friday')!==-1||recur.indexOf('saturday')!==-1||recur.indexOf('sunday')!==-1||recur==='every weekend';
         } else if(mode==='week'){
-          match = weekDates.indexOf(sd)!==-1;
+          for(var w=0;w<weekDates.length;w++){
+            if(inRange(weekDates[w])){ match=true; break; }
+          }
           if(!match&&recur) match = true;
         }
         
@@ -1525,8 +1551,12 @@ function buildSourceFilter4(){
 }
 function buildSourceStats(){
   var srcs={};
+  var canonical={};
   E.forEach(function(e){
-    var s=e.source_name||getSrc(e);
+    var s=(e.source_name||getSrc(e)).trim().replace(/\s+/g,' ');
+    var key=s.toLowerCase();
+    if(!canonical[key])canonical[key]=s;
+    s=canonical[key];
     if(!srcs[s])srcs[s]=0;
     srcs[s]++;
   });
