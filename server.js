@@ -405,6 +405,9 @@ app.get('/', async (req, res) => {
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <!-- Google Analytics -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-YMT2MSCCRZ"></script>
+  <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag('js',new Date());gtag('config','G-YMT2MSCCRZ');</script>
   <title>Malta Events 2026 | Concerts, Festivals, Nightlife & Things to Do in Malta</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Discover the best events happening in Malta and Gozo. Browse concerts, festivals, theatre shows, nightlife parties, sports, food events and cultural activities across the Maltese islands. Updated daily.">
@@ -875,6 +878,9 @@ app.get('/event/:slug', async (req, res) => {
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <!-- Google Analytics -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-YMT2MSCCRZ"></script>
+  <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag('js',new Date());gtag('config','G-YMT2MSCCRZ');</script>
   <title>${title} — ${loc} | Malta Event Guide</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="${desc.replace(/"/g, '&quot;')} — ${dateStr} at ${loc}. Find event details on Malta Event Guide.">
