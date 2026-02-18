@@ -227,9 +227,11 @@ const createCard = (event, isPast) => {
     const safeTitle = (title||'').replace(/'/g, "\\'").replace(/"/g, '&quot;');
 
     const slug = event.slug || generateSlug(event.title);
+    const startDate = getStartDate(event.event_date);
+    const startDateStr = startDate ? startDate.toISOString().split('T')[0] : '';
 
     return `
-    <div class="card event-item ${gray}" data-source="${sourceLower}" data-location="${(event.location||'malta').toLowerCase()}" data-category="${(event.category||'').toLowerCase()}">
+    <div class="card event-item ${gray}" data-source="${sourceLower}" data-location="${(event.location||'malta').toLowerCase()}" data-category="${(event.category||'').toLowerCase()}" data-startdate="${startDateStr}" data-recurring="${event.recurring||''}">
         <a href="/event/${slug}" class="card-media-link">
         <div class="card-media">
             ${dateHTML} ${expired}
@@ -483,6 +485,10 @@ app.get('/', async (req, res) => {
     .filter-bar .reset-btn { padding:10px 18px; border-radius:25px; border:1px solid #e2e8f0; background:white; font-family:inherit; font-size:0.85rem; color:#64748b; cursor:pointer; transition:0.2s; }
     .filter-bar .reset-btn:hover { background:#f1f5f9; color:var(--primary); border-color:var(--primary); }
     .filter-bar .filter-count { font-size:0.85rem; color:#94a3b8; }
+    .quick-filters { max-width:1200px; margin:0 auto 15px; padding:0 20px; display:flex; gap:8px; flex-wrap:wrap; }
+    .qf-btn { padding:8px 18px; border-radius:25px; border:2px solid #e2e8f0; background:white; font-family:inherit; font-size:0.85rem; font-weight:600; color:#475569; cursor:pointer; transition:0.2s; }
+    .qf-btn:hover { border-color:var(--primary); color:var(--primary); }
+    .qf-btn.active { background:var(--primary); color:white; border-color:var(--primary); }
 
     .container { max-width:1200px; margin:0 auto; padding:0 20px; display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:30px; }
     
@@ -537,6 +543,13 @@ app.get('/', async (req, res) => {
     </div>
   </header>
 
+  <div class="quick-filters">
+    <button class="qf-btn" onclick="quickFilter('today',this)">🔥 Today</button>
+    <button class="qf-btn" onclick="quickFilter('tomorrow',this)">📅 Tomorrow</button>
+    <button class="qf-btn" onclick="quickFilter('weekend',this)">🎉 This Weekend</button>
+    <button class="qf-btn" onclick="quickFilter('week',this)">📆 This Week</button>
+    <button class="qf-btn" onclick="quickFilter('all',this)">All</button>
+  </div>
   <div class="filter-bar">
     <select id="sourceSelect" onchange="filterEvents()">
       <option value="">All Sources</option>
@@ -619,6 +632,62 @@ app.get('/', async (req, res) => {
       document.getElementById('showSelect').value = 'upcoming';
       filterEvents();
     }
+    function quickFilter(mode, btn) {
+      document.querySelectorAll('.qf-btn').forEach(function(b){ b.classList.remove('active') });
+      if(mode!=='all') btn.classList.add('active');
+      document.getElementById('showSelect').value = 'all';
+      document.getElementById('sourceSelect').value = '';
+      document.getElementById('categorySelect').value = '';
+      document.getElementById('monthSelect').value = '';
+      document.getElementById('searchInput').value = '';
+      
+      if(mode==='all'){ filterEvents(); return; }
+      
+      var today = new Date(); today.setHours(0,0,0,0);
+      var todayStr = today.toISOString().split('T')[0];
+      var tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate()+1);
+      var tomorrowStr = tomorrow.toISOString().split('T')[0];
+      
+      var weekendDates = [];
+      for(var i=0;i<7;i++){
+        var dd = new Date(today); dd.setDate(dd.getDate()+i);
+        var wd = dd.getDay();
+        if(wd===5||wd===6||wd===0) weekendDates.push(dd.toISOString().split('T')[0]);
+      }
+      var weekDates = [];
+      for(var i=0;i<7;i++){
+        var dd = new Date(today); dd.setDate(dd.getDate()+i);
+        weekDates.push(dd.toISOString().split('T')[0]);
+      }
+      var dayNames = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+      
+      var cards = document.querySelectorAll('.event-item');
+      var visible = 0;
+      cards.forEach(function(card){
+        if(card.classList.contains('separator')){ card.classList.add('hidden'); return; }
+        var sd = card.getAttribute('data-startdate')||'';
+        var recur = (card.getAttribute('data-recurring')||'').toLowerCase();
+        var match = false;
+        
+        if(mode==='today'){
+          match = sd===todayStr;
+          if(!match&&recur){ match = recur.indexOf(dayNames[today.getDay()])!==-1 || (recur==='every weekday'&&today.getDay()>=1&&today.getDay()<=5) || (recur==='every weekend'&&(today.getDay()===0||today.getDay()===6)); }
+        } else if(mode==='tomorrow'){
+          match = sd===tomorrowStr;
+          if(!match&&recur){ match = recur.indexOf(dayNames[tomorrow.getDay()])!==-1 || (recur==='every weekday'&&tomorrow.getDay()>=1&&tomorrow.getDay()<=5) || (recur==='every weekend'&&(tomorrow.getDay()===0||tomorrow.getDay()===6)); }
+        } else if(mode==='weekend'){
+          match = weekendDates.indexOf(sd)!==-1;
+          if(!match&&recur){ match = recur.indexOf('friday')!==-1||recur.indexOf('saturday')!==-1||recur.indexOf('sunday')!==-1||recur==='every weekend'; }
+        } else if(mode==='week'){
+          match = weekDates.indexOf(sd)!==-1;
+          if(!match&&recur) match = true;
+        }
+        
+        card.classList.toggle('hidden', !match);
+        if(match) visible++;
+      });
+      document.getElementById('filterCount').textContent = visible + ' events shown';
+    }
   </script>
 
   <footer style="margin-top:60px;padding:40px 20px;background:#1e293b;color:#94a3b8;text-align:center;font-size:0.85rem;line-height:1.8">
@@ -629,6 +698,14 @@ app.get('/', async (req, res) => {
       <p style="margin-top:8px;font-size:0.75rem;color:#64748b">Powered by <a href="https://bugrayildirim.me/" target="_blank" style="color:#94a3b8;text-decoration:underline">Bugra</a> &middot; <a href="mailto:hello@bugrayildirim.me" style="color:#94a3b8;text-decoration:underline">hello@bugrayildirim.me</a></p>
     </div>
   </footer>
+
+  <div id="scrollTop" onclick="window.scrollTo({top:0,behavior:'smooth'})" style="position:fixed;bottom:30px;right:30px;width:48px;height:48px;background:#0f172a;color:white;border-radius:50%;display:none;align-items:center;justify-content:center;cursor:pointer;font-size:1.3rem;box-shadow:0 4px 15px rgba(0,0,0,0.3);z-index:999;transition:opacity 0.3s,transform 0.3s" onmouseover="this.style.background='#FF385C'" onmouseout="this.style.background='#0f172a'">↑</div>
+  <script>
+    window.addEventListener('scroll',function(){
+      var btn=document.getElementById('scrollTop');
+      if(window.scrollY>600){btn.style.display='flex'}else{btn.style.display='none'}
+    });
+  </script>
 </body>
 </html>`;
     res.send(html);
@@ -732,51 +809,68 @@ app.get('/event/:slug', async (req, res) => {
 
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;700;900&display=swap" rel="stylesheet">
   <style>
-    :root { --bg: #f8fafc; --card-bg: #fff; --text: #1e293b; --primary: #FF385C; }
+    :root { --bg: #f8fafc; --text: #1e293b; --primary: #FF385C; }
     body { font-family:'Outfit',sans-serif; background:var(--bg); margin:0; color:var(--text); }
-    a { color: var(--primary); text-decoration:none; }
-    
-    .nav { background:#0f172a; padding:15px 20px; display:flex; align-items:center; gap:15px; }
+    a { color:var(--primary); text-decoration:none; }
+
+    .nav { background:#0f172a; padding:15px 24px; display:flex; align-items:center; gap:15px; }
     .nav a { color:white; font-weight:700; font-size:1.1rem; }
-    .nav .back { color:#94a3b8; font-size:0.85rem; }
-    
-    .hero { position:relative; height:350px; background:#1e293b; overflow:hidden; }
-    .hero img { width:100%; height:100%; object-fit:cover; }
-    .hero .fallback { width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:white;font-size:8rem;font-weight:800; }
-    
-    .content { max-width:800px; margin:-60px auto 0; padding:0 20px 40px; position:relative; z-index:2; }
-    .main-card { background:white; border-radius:20px; padding:35px; box-shadow:0 10px 40px rgba(0,0,0,0.1); }
-    
-    .source-badge { display:inline-block; background:#f1f5f9; color:#64748b; padding:4px 12px; border-radius:20px; font-size:0.75rem; font-weight:600; text-transform:uppercase; margin-bottom:12px; }
-    h1 { font-size:2rem; font-weight:900; margin:0 0 15px; line-height:1.2; }
-    .meta { display:flex; flex-wrap:wrap; gap:15px; color:#64748b; font-size:0.9rem; margin-bottom:20px; }
-    .meta-item { display:flex; align-items:center; gap:5px; }
-    .cat-badge { display:inline-block; background:#dbeafe; color:#1d4ed8; padding:4px 12px; border-radius:20px; font-size:0.8rem; font-weight:600; }
-    .recur-badge { display:inline-block; background:#dcfce7; color:#15803d; padding:4px 12px; border-radius:20px; font-size:0.8rem; font-weight:600; }
-    .desc { color:#475569; line-height:1.8; font-size:1rem; margin:20px 0; }
-    
-    .cta { display:block; width:100%; padding:18px; background:#0f172a; color:white; text-align:center; border-radius:14px; font-weight:800; font-size:1.1rem; transition:0.3s; box-sizing:border-box; margin-top:25px; }
+    .nav .back { color:#94a3b8; font-size:0.85rem; margin-left:auto; }
+
+    .wrapper { max-width:960px; margin:30px auto; padding:0 20px 40px; }
+
+    .event-layout { display:grid; grid-template-columns:380px 1fr; gap:30px; background:white; border-radius:20px; overflow:hidden; box-shadow:0 4px 24px rgba(0,0,0,0.08); }
+
+    .event-img { position:relative; min-height:320px; background:#1e293b; overflow:hidden; }
+    .event-img img { width:100%; height:100%; object-fit:cover; position:absolute; top:0; left:0; }
+    .event-img .fallback { width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:white;font-size:6rem;font-weight:800;position:absolute;top:0;left:0; }
+
+    .event-details { padding:32px 32px 32px 0; display:flex; flex-direction:column; }
+
+    .source-badge { display:inline-block; background:#f1f5f9; color:#64748b; padding:4px 12px; border-radius:20px; font-size:0.7rem; font-weight:600; text-transform:uppercase; margin-bottom:10px; width:fit-content; }
+    h1 { font-size:1.8rem; font-weight:900; margin:0 0 16px; line-height:1.25; }
+
+    .info-grid { display:flex; flex-direction:column; gap:12px; margin-bottom:18px; }
+    .info-row { display:flex; align-items:center; gap:10px; font-size:0.92rem; color:#475569; }
+    .info-icon { width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:1.1rem; flex-shrink:0; }
+    .info-icon.date { background:#fef3c7; }
+    .info-icon.loc { background:#dbeafe; }
+    .info-icon.cat { background:#ede9fe; }
+    .info-icon.recur { background:#dcfce7; }
+    .info-label { font-weight:600; color:var(--text); }
+
+    .desc { color:#475569; line-height:1.8; font-size:0.95rem; margin:15px 0; flex-grow:1; }
+
+    .cta { display:block; width:100%; padding:16px; background:#0f172a; color:white; text-align:center; border-radius:12px; font-weight:800; font-size:1.05rem; transition:0.3s; box-sizing:border-box; }
     .cta:hover { background:var(--primary); transform:translateY(-2px); box-shadow:0 8px 25px rgba(255,56,92,0.3); }
-    
-    .related { max-width:800px; margin:40px auto; padding:0 20px; }
-    .related h2 { font-size:1.3rem; margin-bottom:15px; }
-    .related-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:15px; }
+
+    .share-row { display:flex; gap:8px; margin-top:12px; }
+    .share-btn { flex:1; padding:10px; border-radius:10px; text-align:center; font-size:0.8rem; font-weight:600; color:white; cursor:pointer; transition:opacity 0.2s; }
+    .share-btn:hover { opacity:0.85; }
+    .share-whatsapp { background:#25D366; }
+    .share-facebook { background:#1877F2; }
+    .share-copy { background:#64748b; }
+
+    .related { max-width:960px; margin:40px auto; padding:0 20px; }
+    .related h2 { font-size:1.2rem; margin-bottom:15px; }
+    .related-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:15px; }
     .rel-card { background:white; border-radius:12px; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,0.06); transition:transform 0.2s; text-decoration:none; color:var(--text); }
     .rel-card:hover { transform:translateY(-3px); box-shadow:0 8px 20px rgba(0,0,0,0.1); }
-    .rel-img { height:120px; background:#eee; overflow:hidden; }
+    .rel-img { height:110px; background:#eee; overflow:hidden; }
     .rel-img img { width:100%; height:100%; object-fit:cover; }
-    .rel-info { padding:12px; }
-    .rel-info .ttl { font-weight:700; font-size:0.85rem; margin-bottom:4px; }
-    .rel-info .dt { color:#94a3b8; font-size:0.75rem; }
-    
+    .rel-info { padding:10px; }
+    .rel-info .ttl { font-weight:700; font-size:0.82rem; margin-bottom:3px; display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden; }
+    .rel-info .dt { color:#94a3b8; font-size:0.72rem; }
+
     .footer { margin-top:40px;padding:30px 20px;background:#1e293b;color:#94a3b8;text-align:center;font-size:0.8rem;line-height:1.8; }
     .footer a { color:#94a3b8; }
-    
-    @media (max-width:600px) {
-      .hero { height:250px; }
-      h1 { font-size:1.5rem; }
-      .content { margin-top:-40px; }
-      .main-card { padding:22px; }
+
+    @media (max-width:750px) {
+      .event-layout { grid-template-columns:1fr; }
+      .event-img { min-height:240px; max-height:280px; }
+      .event-details { padding:24px; }
+      h1 { font-size:1.4rem; }
+      .wrapper { margin-top:15px; }
     }
   </style>
 </head>
@@ -786,22 +880,29 @@ app.get('/event/:slug', async (req, res) => {
     <a href="/" class="back">← All Events</a>
   </nav>
 
-  <div class="hero">
-    ${hasImg ? '<img src="' + img + '" alt="' + title.replace(/"/g, '&quot;') + '" onerror="this.parentElement.innerHTML=\'<div class=fallback style=background:' + bgStyle + '>' + firstLetter + '</div>\'">' : '<div class="fallback" style="background:' + bgStyle + '">' + firstLetter + '</div>'}
-  </div>
-
-  <div class="content">
-    <div class="main-card">
-      <div class="source-badge">${source}</div>
-      <h1>${title}</h1>
-      <div class="meta">
-        ${dateStr ? '<div class="meta-item">📅 ' + dateStr + '</div>' : ''}
-        ${loc !== 'Malta' ? '<div class="meta-item">📍 ' + loc + '</div>' : '<div class="meta-item">📍 Malta</div>'}
+  <div class="wrapper">
+    <div class="event-layout">
+      <div class="event-img">
+        ${hasImg ? '<img src="' + img + '" alt="' + title.replace(/"/g, '&quot;') + '" onerror="this.style.display=\'none\'">' : ''}
+        <div class="fallback" style="background:${bgStyle};${hasImg ? 'z-index:-1;' : ''}">${firstLetter}</div>
       </div>
-      ${event.category ? '<span class="cat-badge">' + (catEmojis[event.category]||'') + ' ' + event.category + '</span> ' : ''}
-      ${event.recurring ? '<span class="recur-badge">🔁 ' + event.recurring + '</span>' : ''}
-      ${event.description ? '<div class="desc">' + event.description + '</div>' : ''}
-      ${externalUrl ? '<a href="' + externalUrl + '" target="_blank" class="cta" onclick="fetch(\'/api/track\',{method:\'POST\',headers:{\'Content-Type\':\'application/json\'},body:JSON.stringify({event_id:' + event.id + ',event_title:\'' + title.replace(/'/g, "\\'") + '\',source:\'' + source + '\'})})">View Event / Get Tickets →</a>' : '<a href="/" class="cta">← Browse More Events</a>'}
+      <div class="event-details">
+        <div class="source-badge">${source}</div>
+        <h1>${title}</h1>
+        <div class="info-grid">
+          ${dateStr ? '<div class="info-row"><div class="info-icon date">📅</div><div><div class="info-label">' + dateStr + '</div></div></div>' : ''}
+          <div class="info-row"><div class="info-icon loc">📍</div><div><div class="info-label">${loc}</div></div></div>
+          ${event.category ? '<div class="info-row"><div class="info-icon cat">' + (catEmojis[event.category]||'📌') + '</div><div><div class="info-label">' + event.category + '</div></div></div>' : ''}
+          ${event.recurring ? '<div class="info-row"><div class="info-icon recur">🔁</div><div><div class="info-label">' + event.recurring + '</div></div></div>' : ''}
+        </div>
+        ${event.description ? '<div class="desc">' + event.description + '</div>' : ''}
+        ${externalUrl ? '<a href="' + externalUrl + '" target="_blank" class="cta" onclick="fetch(\'/api/track\',{method:\'POST\',headers:{\'Content-Type\':\'application/json\'},body:JSON.stringify({event_id:' + event.id + ',event_title:\'' + title.replace(/'/g, "\\'") + '\',source:\'' + source + '\'})})">View Event / Get Tickets →</a>' : '<a href="/" class="cta">← Browse More Events</a>'}
+        <div class="share-row">
+          <div class="share-btn share-whatsapp" onclick="window.open('https://wa.me/?text='+encodeURIComponent('${title.replace(/'/g, "\\'")} - https://maltaeventguide.com/event/${slug}'))">WhatsApp</div>
+          <div class="share-btn share-facebook" onclick="window.open('https://www.facebook.com/sharer/sharer.php?u='+encodeURIComponent('https://maltaeventguide.com/event/${slug}'))">Facebook</div>
+          <div class="share-btn share-copy" onclick="navigator.clipboard.writeText('https://maltaeventguide.com/event/${slug}');this.textContent='Copied!'">Copy Link</div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -823,7 +924,7 @@ app.get('/event/:slug', async (req, res) => {
 
   <div class="footer">
     <a href="/">Malta Event Guide</a> — Your complete guide to events in Malta & Gozo<br>
-    &copy; ${new Date().getFullYear()} maltaeventguide.com · Powered by <a href="https://bugrayildirim.me/" target="_blank">Bugra</a>
+    &copy; ${new Date().getFullYear()} maltaeventguide.com · Powered by <a href="https://bugrayildirim.me/" target="_blank">Bugra</a> · <a href="mailto:hello@bugrayildirim.me">hello@bugrayildirim.me</a>
   </div>
 </body>
 </html>`;
