@@ -308,6 +308,209 @@ async function scrapeVisitMalta() {
   }
 }
 
+// --- 3. RESIDENT ADVISOR (RA.co) ---
+async function scrapeResidentAdvisor() {
+  try {
+    console.log("Resident Advisor scraping...");
+    
+    const fetch = (await import('node-fetch')).default;
+    
+    const today = new Date();
+    const futureDate = new Date(today);
+    futureDate.setDate(futureDate.getDate() + 60);
+    
+    // Try multiple possible Malta area IDs
+    const areaIds = [232, 233, 148, 62];
+    let listings = [];
+    let totalResults = 0;
+    let workingAreaId = null;
+
+    for (const areaId of areaIds) {
+      console.log(`  Trying area ID ${areaId}...`);
+      
+      const query = {
+        query: `query GET_DEFAULT_EVENTS_LISTING($filters: FilterInputDtoInput, $pageSize: Int, $page: Int) {
+          eventListings(filters: $filters, pageSize: $pageSize, page: $page) {
+            data {
+              id
+              listingDate
+              event {
+                id
+                title
+                date
+                startTime
+                endTime
+                contentUrl
+                images {
+                  filename
+                }
+                venue {
+                  name
+                  area {
+                    name
+                  }
+                }
+                artists {
+                  name
+                }
+                pick {
+                  blurb
+                }
+              }
+            }
+            totalResults
+          }
+        }`,
+        variables: {
+          filters: {
+            areas: { eq: areaId },
+            listingDate: {
+              gte: today.toISOString().split('T')[0],
+              lte: futureDate.toISOString().split('T')[0]
+            }
+          },
+          pageSize: 50,
+          page: 1
+        }
+      };
+
+      try {
+        const response = await fetch('https://ra.co/graphql', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Referer': 'https://ra.co/events/mt/all',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+          },
+          body: JSON.stringify(query)
+        });
+
+        const data = await response.json();
+        
+        if (data.data && data.data.eventListings && data.data.eventListings.data) {
+          const results = data.data.eventListings.data;
+          const total = data.data.eventListings.totalResults || 0;
+          
+          // Check if any event mentions Malta in the venue area
+          const hasMalta = results.some(l => {
+            const area = l.event?.venue?.area?.name || '';
+            return area.toLowerCase().includes('malta');
+          });
+          
+          console.log(`    Found ${results.length} events (total: ${total})${hasMalta ? ' ✓ Malta confirmed' : ''}`);
+          
+          if (results.length > 0 && results.length > listings.length) {
+            listings = results;
+            totalResults = total;
+            workingAreaId = areaId;
+            if (hasMalta) break; // Perfect match, stop trying
+          }
+        } else {
+          console.log(`    No results or unexpected response`);
+          if (data.errors) console.log(`    Errors: ${JSON.stringify(data.errors).substring(0, 200)}`);
+        }
+      } catch (fetchErr) {
+        console.log(`    Fetch error: ${fetchErr.message}`);
+      }
+    }
+
+    if (listings.length === 0) {
+      console.log("  RA: No events found for any Malta area ID. You may need to find the correct ID.");
+      console.log("  Tip: Open ra.co/events/mt/all in browser, check Network tab for GraphQL requests to find the area ID.");
+      return;
+    }
+
+    console.log(`\n  RA: Using area ID ${workingAreaId} — ${listings.length} events (total: ${totalResults})`);
+
+    let saved = 0;
+    for (const listing of listings) {
+      const event = listing.event;
+      if (!event || !event.title) continue;
+
+      const title = event.title;
+      const venue = event.venue?.name || 'Malta';
+      const area = event.venue?.area?.name || '';
+      const location = area ? `${venue}, ${area}` : venue;
+      
+      const sourceUrl = event.contentUrl 
+        ? `https://ra.co${event.contentUrl}` 
+        : `https://ra.co/events/${event.id}`;
+      
+      let imageUrl = null;
+      if (event.images && event.images.length > 0 && event.images[0].filename) {
+        imageUrl = `https://images.ra.co/images/${event.images[0].filename}`;
+      }
+
+      const eventDate = listing.listingDate || event.date || null;
+      let dateText = null;
+      if (eventDate) {
+        try {
+          const d = new Date(eventDate);
+          const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+          dateText = `${d.getDate()} ${months[d.getMonth()]}`;
+        } catch(e) {}
+      }
+
+      let description = '';
+      if (event.artists && event.artists.length > 0) {
+        const artistNames = event.artists.map(a => a.name).filter(Boolean);
+        if (artistNames.length > 0) {
+          description = 'Lineup: ' + artistNames.join(', ');
+        }
+      }
+      if (event.pick && event.pick.blurb) {
+        description = event.pick.blurb + (description ? '\n' + description : '');
+      }
+
+      try {
+        await pool.query(
+          `INSERT INTO events (title, location, source_url, image_url, event_date, description, category, source_name) 
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
+           ON CONFLICT (source_url) DO UPDATE SET 
+             title = EXCLUDED.title,
+             image_url = COALESCE(EXCLUDED.image_url, events.image_url),
+             event_date = COALESCE(EXCLUDED.event_date, events.event_date),
+             description = COALESCE(EXCLUDED.description, events.description),
+             category = COALESCE(EXCLUDED.category, events.category)`,
+          [title, location, sourceUrl, imageUrl, dateText, description || null, 'Nightlife & Parties', 'Resident Advisor']
+        );
+        saved++;
+      } catch (dbErr) {
+        if (dbErr.message.includes('column')) {
+          try {
+            await pool.query(
+              'INSERT INTO events (title, location, source_url, image_url) VALUES ($1, $2, $3, $4) ON CONFLICT (source_url) DO NOTHING',
+              [title, location, sourceUrl, imageUrl]
+            );
+            saved++;
+          } catch(e) {}
+        } else {
+          console.error(`  DB error (${title}):`, dbErr.message);
+        }
+      }
+    }
+
+    console.log(`  RA: ${saved} events saved/updated`);
+
+    if (listings.length > 0) {
+      console.log("\n  === RA SAMPLE EVENTS ===");
+      listings.slice(0, 5).forEach(l => {
+        const e = l.event;
+        console.log(`  Title:    ${e.title}`);
+        console.log(`  Venue:    ${e.venue?.name || 'N/A'}`);
+        console.log(`  Date:     ${l.listingDate || 'N/A'}`);
+        console.log(`  Artists:  ${(e.artists||[]).map(a=>a.name).join(', ') || 'N/A'}`);
+        console.log(`  Image:    ${e.images?.[0]?.filename ? 'YES' : 'NO'}`);
+        console.log(`  URL:      https://ra.co${e.contentUrl || '/events/' + e.id}`);
+        console.log(`  ---`);
+      });
+    }
+
+  } catch (err) {
+    console.error("Resident Advisor Error:", err.message);
+  }
+}
+
 // --- RUN ---
 async function run() {
   console.log("=== Event Scraper Starting ===\n");
@@ -321,6 +524,8 @@ async function run() {
     await scrapeShowsHappening(browser);
     console.log("\n---\n");
     await scrapeVisitMalta();
+    console.log("\n---\n");
+    await scrapeResidentAdvisor();
   } finally {
     await browser.close();
     await pool.end();
