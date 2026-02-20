@@ -320,7 +320,7 @@ async function scrapeResidentAdvisor() {
     futureDate.setDate(futureDate.getDate() + 60);
     
     // Try multiple possible Malta area IDs
-    const areaIds = [232, 233, 148, 62];
+    const areaIds = [164];
     let listings = [];
     let totalResults = 0;
     let workingAreaId = null;
