@@ -344,10 +344,14 @@ async function scrapeResidentAdvisor() {
                 images {
                   filename
                 }
+                flyerFront
                 venue {
                   name
                   area {
                     name
+                    country {
+                      name
+                    }
                   }
                 }
                 artists {
@@ -394,7 +398,8 @@ async function scrapeResidentAdvisor() {
           // Check if any event mentions Malta in the venue area
           const hasMalta = results.some(l => {
             const area = l.event?.venue?.area?.name || '';
-            return area.toLowerCase().includes('malta');
+            const country = l.event?.venue?.area?.country?.name || '';
+            return area.toLowerCase().includes('malta') || country.toLowerCase().includes('malta');
           });
           
           console.log(`    Found ${results.length} events (total: ${total})${hasMalta ? ' ✓ Malta confirmed' : ''}`);
@@ -430,7 +435,10 @@ async function scrapeResidentAdvisor() {
       const title = event.title;
       const venue = event.venue?.name || 'Malta';
       const area = event.venue?.area?.name || '';
-      const location = area ? `${venue}, ${area}` : venue;
+      const country = event.venue?.area?.country?.name || '';
+      // "All" is not a useful area name - use country or just "Malta"
+      const locationArea = (area && area.toLowerCase() !== 'all') ? area : (country || 'Malta');
+      const location = `${venue}, ${locationArea}`;
       
       const sourceUrl = event.contentUrl 
         ? `https://ra.co${event.contentUrl}` 
@@ -438,7 +446,20 @@ async function scrapeResidentAdvisor() {
       
       let imageUrl = null;
       if (event.images && event.images.length > 0 && event.images[0].filename) {
-        imageUrl = `https://images.ra.co/images/${event.images[0].filename}`;
+        const fn = event.images[0].filename;
+        // RA image URLs can be: full URL, just filename, or path
+        if (fn.startsWith('http')) {
+          imageUrl = fn;
+        } else if (fn.startsWith('/')) {
+          imageUrl = `https://images.ra.co${fn}`;
+        } else {
+          // Try with query params for proper sizing
+          imageUrl = `https://images.ra.co/${fn}?width=640`;
+        }
+      }
+      // Also try flyerFront if images array is empty
+      if (!imageUrl && event.flyerFront) {
+        imageUrl = event.flyerFront;
       }
 
       const eventDate = listing.listingDate || event.date || null;
@@ -497,10 +518,11 @@ async function scrapeResidentAdvisor() {
       listings.slice(0, 5).forEach(l => {
         const e = l.event;
         console.log(`  Title:    ${e.title}`);
-        console.log(`  Venue:    ${e.venue?.name || 'N/A'}`);
+        console.log(`  Venue:    ${e.venue?.name || 'N/A'}, ${e.venue?.area?.country?.name || 'N/A'}`);
         console.log(`  Date:     ${l.listingDate || 'N/A'}`);
         console.log(`  Artists:  ${(e.artists||[]).map(a=>a.name).join(', ') || 'N/A'}`);
-        console.log(`  Image:    ${e.images?.[0]?.filename ? 'YES' : 'NO'}`);
+        console.log(`  Images:   ${JSON.stringify(e.images || [])}`);
+        console.log(`  Flyer:    ${e.flyerFront || 'N/A'}`);
         console.log(`  URL:      https://ra.co${e.contentUrl || '/events/' + e.id}`);
         console.log(`  ---`);
       });
