@@ -1433,6 +1433,7 @@ app.get('/admin', (req, res) => {
       <div class="tab" onclick="switchTab('manage',this)">📋 Manage</div>
       <div class="tab" onclick="switchTab('add',this)">➕ Add Event</div>
       <div class="tab" onclick="switchTab('analytics',this)">📊 Analytics</div>
+      <div class="tab" onclick="switchTab('instagram',this)">📸 Instagram</div>
     </div>
 
     <!-- IMAGES TAB -->
@@ -1590,6 +1591,54 @@ app.get('/admin', (req, res) => {
     </div>
   </div>
 
+  <!-- INSTAGRAM TAB -->
+  <div id="instagramTab" style="display:none">
+    <div style="display:flex;gap:20px;flex-wrap:wrap">
+      <!-- Left: Controls -->
+      <div style="flex:1;min-width:300px">
+        <h3 style="margin:0 0 15px;color:white">Generate Instagram Post</h3>
+        
+        <div style="margin-bottom:12px">
+          <label style="display:block;color:#94a3b8;font-size:0.8rem;margin-bottom:4px">Template</label>
+          <select id="igTemplate" onchange="igPreview()" style="width:100%;padding:10px;border-radius:8px;border:1px solid #334155;background:#1e293b;color:white;font-family:inherit">
+            <option value="single">🎤 Single Event Spotlight</option>
+            <option value="weekend">🎉 This Weekend</option>
+            <option value="top5">🔥 Top 5 This Week</option>
+          </select>
+        </div>
+
+        <div id="igSingleControls">
+          <div style="margin-bottom:12px">
+            <label style="display:block;color:#94a3b8;font-size:0.8rem;margin-bottom:4px">Search Event</label>
+            <input type="text" id="igSearch" placeholder="Type event name..." oninput="igFilterEvents()" style="width:100%;padding:10px;border-radius:8px;border:1px solid #334155;background:#1e293b;color:white;font-family:inherit;box-sizing:border-box">
+          </div>
+          <div id="igEventList" style="max-height:300px;overflow-y:auto;border-radius:8px;background:#1e293b"></div>
+        </div>
+
+        <div id="igMultiControls" style="display:none">
+          <p style="color:#94a3b8;font-size:0.85rem">Events are auto-selected based on the template. Click "Generate" to create the post.</p>
+        </div>
+
+        <div style="margin-top:15px;display:flex;gap:10px">
+          <button onclick="igGenerate()" style="flex:1;padding:12px;border-radius:10px;border:none;background:#FF385C;color:white;font-family:inherit;font-weight:700;font-size:0.9rem;cursor:pointer">Generate Post</button>
+          <button onclick="igDownload()" id="igDownloadBtn" style="flex:1;padding:12px;border-radius:10px;border:1px solid #334155;background:transparent;color:#94a3b8;font-family:inherit;font-weight:600;font-size:0.9rem;cursor:pointer;display:none">⬇ Download</button>
+        </div>
+
+        <div style="margin-top:15px;padding:12px;background:#1e293b;border-radius:8px">
+          <div style="color:#94a3b8;font-size:0.8rem;margin-bottom:6px">Suggested caption & hashtags:</div>
+          <textarea id="igCaption" rows="5" style="width:100%;padding:10px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:white;font-family:inherit;font-size:0.85rem;resize:vertical;box-sizing:border-box"></textarea>
+          <button onclick="navigator.clipboard.writeText(document.getElementById('igCaption').value);toast('Caption copied!')" style="margin-top:6px;padding:6px 14px;border-radius:6px;border:1px solid #334155;background:transparent;color:#94a3b8;font-family:inherit;font-size:0.8rem;cursor:pointer">📋 Copy caption</button>
+        </div>
+      </div>
+
+      <!-- Right: Preview -->
+      <div style="flex:1;min-width:300px;display:flex;flex-direction:column;align-items:center">
+        <h3 style="margin:0 0 15px;color:white">Preview (1080×1080)</h3>
+        <canvas id="igCanvas" width="1080" height="1080" style="width:100%;max-width:500px;border-radius:12px;background:#0f172a"></canvas>
+      </div>
+    </div>
+  </div>
+
   <div class="toast" id="toast"></div>
 
   <script src="/admin/js"></script>
@@ -1637,10 +1686,11 @@ function switchTab(t,el){
   tab=t;
   document.querySelectorAll('.tab').forEach(function(x){x.classList.remove('active')});
   el.classList.add('active');
-  ['imagesTab','datesTab','categoriesTab','manageTab','addTab','analyticsTab'].forEach(function(id){document.getElementById(id).style.display='none'});
-  var map={images:'imagesTab',dates:'datesTab',categories:'categoriesTab',manage:'manageTab',add:'addTab',analytics:'analyticsTab'};
+  ['imagesTab','datesTab','categoriesTab','manageTab','addTab','analyticsTab','instagramTab'].forEach(function(id){document.getElementById(id).style.display='none'});
+  var map={images:'imagesTab',dates:'datesTab',categories:'categoriesTab',manage:'manageTab',add:'addTab',analytics:'analyticsTab',instagram:'instagramTab'};
   document.getElementById(map[t]).style.display='';
   if(t==='analytics')loadAnalytics();
+  if(t==='instagram')igInit();
 }
 function ssf(f,b){sf1v=f;document.querySelectorAll('#imagesTab .fb').forEach(function(x){x.classList.remove('active')});b.classList.add('active');af1()}
 function af1(){
@@ -1983,6 +2033,351 @@ function api(method,url,body,cb){
     .then(function(r){if(!r.ok)throw 0;return r.json()}).then(cb).catch(function(){toast('Failed',1)});
 }
 function toast(m,e){var t=document.getElementById('toast');t.textContent=m;t.className='toast show'+(e?' err':'');setTimeout(function(){t.className='toast'},3000)}
+
+// ========== INSTAGRAM POST GENERATOR ==========
+var igSelectedEvent=null;
+var igLogoImg=null;
+
+function igInit(){
+  if(!igLogoImg){
+    igLogoImg=new Image();
+    igLogoImg.crossOrigin='anonymous';
+    igLogoImg.src='/logo.png';
+  }
+  igTemplateChange();
+  igDrawEmpty();
+}
+
+function igTemplateChange(){
+  var t=document.getElementById('igTemplate').value;
+  document.getElementById('igSingleControls').style.display=t==='single'?'':'none';
+  document.getElementById('igMultiControls').style.display=t!=='single'?'':'none';
+}
+
+function igFilterEvents(){
+  var q=document.getElementById('igSearch').value.toLowerCase();
+  var list=document.getElementById('igEventList');
+  if(!q){list.innerHTML='';return}
+  var matches=E.filter(function(e){return e.title&&e.title.toLowerCase().indexOf(q)>=0}).slice(0,15);
+  list.innerHTML=matches.map(function(e){
+    var hasImg=e.image_url&&e.image_url.indexOf('http')===0;
+    return '<div onclick="igSelectEvent('+e.id+')" style="padding:10px 12px;cursor:pointer;border-bottom:1px solid #1a2332;display:flex;align-items:center;gap:10px;transition:0.15s" onmouseover="this.style.background=\\'#334155\\'" onmouseout="this.style.background=\\'transparent\\'">'
+      +(hasImg?'<img src="'+esc(e.image_url)+'" style="width:40px;height:40px;border-radius:6px;object-fit:cover">':'<div style="width:40px;height:40px;border-radius:6px;background:#334155;display:flex;align-items:center;justify-content:center;font-size:1.2rem">🎵</div>')
+      +'<div><div style="color:white;font-size:0.85rem;font-weight:600">'+esc(e.title)+'</div>'
+      +'<div style="color:#64748b;font-size:0.75rem">'+(e.event_date||'No date')+' · '+(e.location||'Malta')+'</div></div></div>';
+  }).join('');
+}
+
+function igSelectEvent(id){
+  igSelectedEvent=E.find(function(e){return e.id===id});
+  document.getElementById('igSearch').value=igSelectedEvent.title;
+  document.getElementById('igEventList').innerHTML='<div style="padding:10px;color:#4ade80;font-size:0.85rem">✓ Selected: '+esc(igSelectedEvent.title)+'</div>';
+  igGenerate();
+}
+
+function igDrawEmpty(){
+  var c=document.getElementById('igCanvas');
+  var ctx=c.getContext('2d');
+  ctx.fillStyle='#0f172a';
+  ctx.fillRect(0,0,1080,1080);
+  ctx.fillStyle='#334155';
+  ctx.font='600 24px Outfit, sans-serif';
+  ctx.textAlign='center';
+  ctx.fillText('Select an event or template to generate a post',540,540);
+}
+
+function igGenerate(){
+  var template=document.getElementById('igTemplate').value;
+  if(template==='single') igGenSingle();
+  else if(template==='weekend') igGenMulti('weekend');
+  else if(template==='top5') igGenMulti('top5');
+}
+
+function igGenSingle(){
+  if(!igSelectedEvent)return toast('Select an event first',1);
+  var e=igSelectedEvent;
+  var c=document.getElementById('igCanvas');
+  var ctx=c.getContext('2d');
+  
+  // Background gradient
+  var grad=ctx.createLinearGradient(0,0,0,1080);
+  grad.addColorStop(0,'#0f172a');
+  grad.addColorStop(0.5,'#1e293b');
+  grad.addColorStop(1,'#0f172a');
+  ctx.fillStyle=grad;
+  ctx.fillRect(0,0,1080,1080);
+
+  // Accent line top
+  ctx.fillStyle='#FF385C';
+  ctx.fillRect(0,0,1080,6);
+
+  var afterImage=function(){
+    // Event title
+    ctx.fillStyle='white';
+    ctx.font='800 52px Outfit, sans-serif';
+    ctx.textAlign='center';
+    var title=e.title||'Event';
+    var words=title.split(' '),lines=[],line='';
+    for(var i=0;i<words.length;i++){
+      var test=line+(line?' ':'')+words[i];
+      if(ctx.measureText(test).width>900&&line){lines.push(line);line=words[i]}
+      else line=test;
+    }
+    if(line)lines.push(line);
+    var titleY=lines.length>2?680:710;
+    for(var i=0;i<Math.min(lines.length,3);i++){
+      ctx.fillText(lines[i],540,titleY+i*62);
+    }
+
+    // Date pill
+    if(e.event_date){
+      var dateY=titleY+lines.length*62+20;
+      ctx.font='600 28px Outfit, sans-serif';
+      var dateW=ctx.measureText(e.event_date).width+40;
+      ctx.fillStyle='#FF385C';
+      igRoundRect(ctx,540-dateW/2,dateY-8,dateW,44,22);
+      ctx.fill();
+      ctx.fillStyle='white';
+      ctx.fillText(e.event_date,540,dateY+24);
+    }
+
+    // Location
+    if(e.location){
+      var locY=(e.event_date?titleY+lines.length*62+80:titleY+lines.length*62+30);
+      ctx.font='400 26px Outfit, sans-serif';
+      ctx.fillStyle='#94a3b8';
+      ctx.fillText('📍 '+(e.location||'Malta'),540,locY);
+    }
+
+    // Category pill
+    if(e.category){
+      ctx.font='500 20px Outfit, sans-serif';
+      var catW=ctx.measureText(e.category).width+30;
+      ctx.fillStyle='rgba(255,56,92,0.15)';
+      igRoundRect(ctx,540-catW/2,630-6,catW,32,16);
+      ctx.fill();
+      ctx.fillStyle='#FF385C';
+      ctx.fillText(e.category,540,650);
+    }
+
+    // Logo at bottom
+    if(igLogoImg&&igLogoImg.complete){
+      var lh=55,lw=lh*(igLogoImg.width/igLogoImg.height);
+      ctx.drawImage(igLogoImg,540-lw/2,1000,lw,lh);
+    } else {
+      ctx.font='600 22px Outfit, sans-serif';
+      ctx.fillStyle='#64748b';
+      ctx.fillText('maltaeventguide.com',540,1040);
+    }
+
+    // Bottom accent
+    ctx.fillStyle='#FF385C';
+    ctx.fillRect(0,1074,1080,6);
+
+    document.getElementById('igDownloadBtn').style.display='';
+    igSetCaption(e);
+  };
+
+  // Try loading event image
+  if(e.image_url&&e.image_url.indexOf('http')===0){
+    var img=new Image();
+    img.crossOrigin='anonymous';
+    img.onload=function(){
+      // Draw image centered in top area with rounded corners effect
+      var iw=img.width,ih=img.height;
+      var targetW=900,targetH=550;
+      var scale=Math.max(targetW/iw,targetH/ih);
+      var sw=iw*scale,sh=ih*scale;
+      var sx=540-sw/2,sy=50;
+      
+      ctx.save();
+      igRoundRect(ctx,90,50,900,550,20);
+      ctx.clip();
+      ctx.drawImage(img,sx,sy,sw,sh);
+      ctx.restore();
+      
+      // Subtle border
+      ctx.strokeStyle='rgba(255,255,255,0.1)';
+      ctx.lineWidth=2;
+      igRoundRect(ctx,90,50,900,550,20);
+      ctx.stroke();
+      
+      afterImage();
+    };
+    img.onerror=function(){afterImage()};
+    img.src=e.image_url;
+  } else {
+    // No image - draw placeholder
+    ctx.fillStyle='#1e293b';
+    igRoundRect(ctx,90,50,900,550,20);
+    ctx.fill();
+    ctx.fillStyle='#334155';
+    ctx.font='600 80px Outfit, sans-serif';
+    ctx.textAlign='center';
+    ctx.fillText('🎵',540,350);
+    afterImage();
+  }
+}
+
+function igGenMulti(type){
+  var c=document.getElementById('igCanvas');
+  var ctx=c.getContext('2d');
+  
+  // Get upcoming events
+  var now=new Date();
+  var events=E.filter(function(e){return e.title&&e.event_date}).slice(0,50);
+  
+  var selected=[];
+  if(type==='weekend'){
+    // Find events with dates containing current/next weekend day names or dates
+    var dayNames=['Fri','Sat','Sun','Friday','Saturday','Sunday'];
+    selected=events.filter(function(e){
+      for(var i=0;i<dayNames.length;i++){
+        if(e.event_date&&e.event_date.indexOf(dayNames[i])>=0)return true;
+      }
+      return false;
+    }).slice(0,5);
+    if(selected.length===0) selected=events.slice(0,5);
+  } else {
+    selected=events.slice(0,5);
+  }
+
+  // Background
+  var grad=ctx.createLinearGradient(0,0,1080,1080);
+  grad.addColorStop(0,'#0f172a');
+  grad.addColorStop(1,'#1e293b');
+  ctx.fillStyle=grad;
+  ctx.fillRect(0,0,1080,1080);
+
+  // Top accent
+  ctx.fillStyle='#FF385C';
+  ctx.fillRect(0,0,1080,6);
+
+  // Title
+  ctx.fillStyle='white';
+  ctx.font='800 56px Outfit, sans-serif';
+  ctx.textAlign='center';
+  ctx.fillText(type==='weekend'?'THIS WEEKEND IN MALTA':'TOP EVENTS THIS WEEK',540,90);
+
+  // Subtitle
+  ctx.font='400 24px Outfit, sans-serif';
+  ctx.fillStyle='#94a3b8';
+  ctx.fillText('maltaeventguide.com',540,130);
+
+  // Event rows
+  var startY=180;
+  var rowH=160;
+  selected.forEach(function(e,i){
+    var y=startY+i*rowH;
+    
+    // Row background
+    ctx.fillStyle=i%2===0?'rgba(30,41,59,0.5)':'rgba(15,23,42,0.5)';
+    igRoundRect(ctx,50,y,980,rowH-12,14);
+    ctx.fill();
+
+    // Number circle
+    ctx.fillStyle='#FF385C';
+    ctx.beginPath();
+    ctx.arc(110,y+rowH/2-6,28,0,Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle='white';
+    ctx.font='700 28px Outfit, sans-serif';
+    ctx.textAlign='center';
+    ctx.fillText(''+(i+1),110,y+rowH/2+4);
+
+    // Title
+    ctx.textAlign='left';
+    ctx.fillStyle='white';
+    ctx.font='700 30px Outfit, sans-serif';
+    var t=e.title.length>35?e.title.substring(0,35)+'...':e.title;
+    ctx.fillText(t,160,y+55);
+
+    // Date & location
+    ctx.font='400 22px Outfit, sans-serif';
+    ctx.fillStyle='#94a3b8';
+    ctx.fillText((e.event_date||'TBA')+' · '+(e.location||'Malta'),160,y+90);
+
+    // Category pill
+    if(e.category){
+      ctx.font='500 18px Outfit, sans-serif';
+      var cw=ctx.measureText(e.category).width+20;
+      ctx.fillStyle='rgba(255,56,92,0.15)';
+      igRoundRect(ctx,160,y+102,cw,28,14);
+      ctx.fill();
+      ctx.fillStyle='#FF385C';
+      ctx.textAlign='left';
+      ctx.fillText(e.category,170,y+122);
+    }
+
+    ctx.textAlign='center';
+  });
+
+  // Logo
+  if(igLogoImg&&igLogoImg.complete){
+    var lh=55,lw=lh*(igLogoImg.width/igLogoImg.height);
+    ctx.drawImage(igLogoImg,540-lw/2,1000,lw,lh);
+  }
+
+  // Bottom accent
+  ctx.fillStyle='#FF385C';
+  ctx.fillRect(0,1074,1080,6);
+
+  document.getElementById('igDownloadBtn').style.display='';
+
+  // Set caption
+  var cap=type==='weekend'?'🎉 This weekend in Malta!\\n\\n':'🔥 Top events this week in Malta!\\n\\n';
+  selected.forEach(function(e,i){
+    cap+=(i+1)+'. '+e.title+(e.event_date?' — '+e.event_date:'')+'\\n';
+  });
+  cap+='\\n👉 Full listings at maltaeventguide.com\\n\\n#MaltaEvents #WhatsOnMalta #MaltaNightlife #MaltaFestivals #ThingsToDoInMalta #VisitMalta #MaltaLife #ExploreMalta #Malta2026';
+  document.getElementById('igCaption').value=cap;
+}
+
+function igSetCaption(e){
+  var cap='🎤 '+e.title+'\\n\\n';
+  if(e.event_date)cap+='📅 '+e.event_date+'\\n';
+  if(e.location)cap+='📍 '+e.location+'\\n';
+  if(e.description){
+    var d=e.description.length>200?e.description.substring(0,200)+'...':e.description;
+    cap+='\\n'+d+'\\n';
+  }
+  cap+='\\n👉 Link in bio for full details & more events!\\n\\n#MaltaEvents #WhatsOnMalta #ThingsToDoInMalta #VisitMalta #MaltaLife #ExploreMalta';
+  if(e.category){
+    if(e.category.indexOf('Music')>=0||e.category.indexOf('Concert')>=0) cap+=' #LiveMusicMalta #MaltaConcerts';
+    if(e.category.indexOf('Nightlife')>=0) cap+=' #MaltaNightlife #Paceville';
+    if(e.category.indexOf('Festival')>=0) cap+=' #MaltaFestivals';
+    if(e.category.indexOf('Theatre')>=0) cap+=' #MaltaTheatre';
+    if(e.category.indexOf('Food')>=0) cap+=' #MaltaFood #MaltaFoodie';
+    if(e.category.indexOf('Sport')>=0) cap+=' #MaltaSports';
+  }
+  document.getElementById('igCaption').value=cap;
+}
+
+function igDownload(){
+  var c=document.getElementById('igCanvas');
+  var link=document.createElement('a');
+  link.download='malta-event-guide-post.png';
+  link.href=c.toDataURL('image/png');
+  link.click();
+  toast('Image downloaded!');
+}
+
+function igRoundRect(ctx,x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.lineTo(x+w-r,y);
+  ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r);
+  ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h);
+  ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r);
+  ctx.quadraticCurveTo(x,y,x+r,y);
+  ctx.closePath();
+}
+
+function igPreview(){igTemplateChange();}
+// ========== END INSTAGRAM ==========
 `);
 });
 
