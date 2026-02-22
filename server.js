@@ -2720,12 +2720,20 @@ app.post('/admin/api/import-drafts', async (req, res) => {
     let count = 0;
     for (const e of events) {
       const slug = (e.title || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').substring(0, 80);
-      await pool.query(
-        `INSERT INTO events (title, event_date, location, description, source_url, source_name, slug, status, image_url, category)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, 'draft', '', '')`,
-        [e.title, e.event_date, e.location, e.description, e.source_url, e.source_name || 'Community Events Malta', slug]
-      );
-      count++;
+      // Make source_url unique by appending draft timestamp if empty or duplicate
+      const sourceUrl = e.source_url || ('manual:draft-' + Date.now() + '-' + count);
+      try {
+        await pool.query(
+          `INSERT INTO events (title, event_date, location, description, source_url, source_name, slug, status, image_url, category)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, 'draft', '', '')
+           ON CONFLICT (source_url) DO NOTHING`,
+          [e.title, e.event_date, e.location, e.description, sourceUrl, e.source_name || 'Community Events Malta', slug]
+        );
+        count++;
+      } catch(err) {
+        // Skip duplicates silently
+        console.log('Skipped duplicate:', e.title);
+      }
     }
     res.json({ ok: true, count });
   } catch (e) {
