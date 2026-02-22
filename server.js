@@ -268,6 +268,11 @@ app.get('/robots.txt', (req, res) => {
   res.type('text/plain').send(`User-agent: *
 Allow: /
 Disallow: /admin
+Disallow: /*?month=
+Disallow: /*?source=
+Disallow: /*?category=
+Disallow: /*?q=
+
 Sitemap: https://maltaeventguide.com/sitemap.xml`);
 });
 
@@ -283,6 +288,13 @@ app.get('/sitemap.xml', async (req, res) => {
     <priority>0.8</priority>
   </url>`).join('\n');
   } catch(e) {}
+  const catPages = ['music-events-malta','nightlife-malta','festivals-malta','theatre-shows-malta','arts-culture-malta','sports-events-malta','food-drink-events-malta','family-events-malta','free-events-malta'];
+  const catUrls = catPages.map(s => `  <url>
+    <loc>https://maltaeventguide.com/${s}</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+  </url>`).join('\n');
   res.type('application/xml').send(`<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
@@ -291,8 +303,116 @@ app.get('/sitemap.xml', async (req, res) => {
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
+${catUrls}
 ${eventUrls}
 </urlset>`);
+});
+
+// =====================================================================
+// CATEGORY SEO LANDING PAGES
+// =====================================================================
+const categoryPages = {
+  'music-events-malta': { cat: 'Music & Concerts', h1: 'Music Events in Malta', desc: 'Discover live music concerts, DJ sets, and musical performances happening across Malta and Gozo.' },
+  'nightlife-malta': { cat: 'Nightlife & Parties', h1: 'Nightlife & Parties in Malta', desc: 'Find the best clubs, parties, DJ events and nightlife experiences in Malta. From Paceville to Valletta.' },
+  'festivals-malta': { cat: 'Festivals', h1: 'Festivals in Malta', desc: 'Explore upcoming festivals in Malta and Gozo. Music festivals, cultural celebrations, food festivals and more.' },
+  'theatre-shows-malta': { cat: 'Theatre & Shows', h1: 'Theatre & Shows in Malta', desc: 'Browse upcoming theatre performances, comedy shows, and live entertainment across Malta.' },
+  'arts-culture-malta': { cat: 'Arts & Culture', h1: 'Arts & Culture Events in Malta', desc: 'Discover art exhibitions, cultural events, museum openings and heritage activities in Malta and Gozo.' },
+  'sports-events-malta': { cat: 'Sports & Adventure', h1: 'Sports & Adventure Events in Malta', desc: 'Find sporting events, outdoor adventures, races and fitness activities happening in Malta.' },
+  'food-drink-events-malta': { cat: 'Food & Drink', h1: 'Food & Drink Events in Malta', desc: 'Wine tastings, food festivals, restaurant events and culinary experiences across Malta and Gozo.' },
+  'family-events-malta': { cat: 'Family', h1: 'Family Events in Malta', desc: 'Kid-friendly events, family outings, and activities for all ages in Malta and Gozo.' },
+  'free-events-malta': { cat: '_free', h1: 'Free Events in Malta', desc: 'Discover free things to do in Malta and Gozo. Concerts, exhibitions, festivals and community events that cost nothing.' }
+};
+
+Object.entries(categoryPages).forEach(([slug, config]) => {
+  app.get(`/${slug}`, async (req, res) => {
+    try {
+      let events;
+      if (config.cat === '_free') {
+        events = await pool.query("SELECT * FROM events WHERE LOWER(description) LIKE '%free%' OR LOWER(title) LIKE '%free%' ORDER BY id DESC LIMIT 50");
+      } else {
+        events = await pool.query('SELECT * FROM events WHERE category = $1 ORDER BY id DESC LIMIT 50', [config.cat]);
+      }
+      const rows = events.rows;
+
+      res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Google Analytics -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-YMT2MSCCRZ"></script>
+  <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag('js',new Date());gtag('config','G-YMT2MSCCRZ');</script>
+  <title>${config.h1} 2026 | Malta Event Guide</title>
+  <meta name="description" content="${config.desc} Updated daily on Malta Event Guide.">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://maltaeventguide.com/${slug}">
+  <meta property="og:title" content="${config.h1} 2026">
+  <meta property="og:description" content="${config.desc}">
+  <meta property="og:url" content="https://maltaeventguide.com/${slug}">
+  <meta property="og:type" content="website">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    "name": "${config.h1}",
+    "description": "${config.desc}",
+    "url": "https://maltaeventguide.com/${slug}",
+    "isPartOf": { "@type": "WebSite", "name": "Malta Event Guide", "url": "https://maltaeventguide.com/" }
+  }
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root { --bg: #f8fafc; --text: #1e293b; --primary: #FF385C; }
+    body { font-family:'Outfit',sans-serif; background:var(--bg); margin:0; color:var(--text); }
+    a { color:var(--primary); text-decoration:none; }
+    .nav { background:#0f172a; padding:15px 24px; display:flex; align-items:center; gap:15px; }
+    .nav a { color:white; font-weight:700; font-size:1.1rem; }
+    .nav .back { color:#94a3b8; font-size:0.85rem; margin-left:auto; }
+    .hero { max-width:900px; margin:30px auto; padding:0 20px; }
+    .hero h1 { font-size:2rem; margin:0 0 10px; }
+    .hero p { color:#64748b; font-size:1rem; line-height:1.6; margin:0 0 25px; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:18px; max-width:900px; margin:0 auto; padding:0 20px 50px; }
+    .card { background:white; border-radius:16px; overflow:hidden; box-shadow:0 2px 12px rgba(0,0,0,0.06); transition:0.2s; }
+    .card:hover { transform:translateY(-3px); box-shadow:0 8px 24px rgba(0,0,0,0.1); }
+    .card-img { height:180px; background:#e2e8f0; background-size:cover; background-position:center; }
+    .card-body { padding:14px; }
+    .card-title { font-weight:700; font-size:0.95rem; margin:0 0 6px; }
+    .card-meta { font-size:0.8rem; color:#64748b; }
+    .internal-links { max-width:900px; margin:20px auto; padding:20px; background:white; border-radius:16px; font-size:0.9rem; line-height:1.8; }
+    .internal-links a { margin-right:16px; }
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <a href="/">Malta Event Guide</a>
+    <a href="/" class="back">← All Events</a>
+  </div>
+  <div class="hero">
+    <h1>${config.h1}</h1>
+    <p>${config.desc} Browse ${rows.length}+ events below.</p>
+  </div>
+  <div class="grid">
+    ${rows.map(e => {
+      const eventSlug = e.slug || '';
+      const img = e.image_url && !e.image_url.includes('/api/v2/file/') ? e.image_url : '';
+      return `<a href="/event/${eventSlug}" style="text-decoration:none;color:inherit"><div class="card">
+        <div class="card-img" style="${img ? `background-image:url('${img}')` : 'background:#1e293b'}"></div>
+        <div class="card-body">
+          <div class="card-title">${e.title || ''}</div>
+          <div class="card-meta">${e.event_date || ''} · ${e.location || 'Malta'}</div>
+        </div>
+      </div></a>`;
+    }).join('')}
+  </div>
+  <div class="internal-links">
+    <strong>Explore more events:</strong><br>
+    ${Object.entries(categoryPages).filter(([s]) => s !== slug).map(([s, c]) => `<a href="/${s}">${c.h1.replace(' in Malta','')}</a>`).join(' ')}
+    <a href="/">All Events</a>
+  </div>
+</body>
+</html>`);
+    } catch(e) { res.redirect('/'); }
+  });
 });
 
 // =====================================================================
@@ -771,10 +891,34 @@ app.get('/', async (req, res) => {
     <div style="max-width:800px;margin:0 auto">
       <h2 style="color:white;font-size:1.2rem;margin:0 0 10px">Malta Event Guide</h2>
       <p>Your complete guide to events in Malta and Gozo. Discover concerts, festivals, theatre, nightlife, sports, arts and cultural events happening across the Maltese islands.</p>
-      <p style="margin-top:15px;font-size:0.75rem;color:#64748b">&copy; ${new Date().getFullYear()} maltaeventguide.com &middot; Events sourced from ShowsHappening, VisitMalta and local organizers</p>
+      <div style="margin-top:20px;padding-top:15px;border-top:1px solid #334155;font-size:0.8rem;line-height:2.2">
+        <a href="/music-events-malta" style="color:#94a3b8;margin:0 8px">Music Events</a> &middot;
+        <a href="/nightlife-malta" style="color:#94a3b8;margin:0 8px">Nightlife</a> &middot;
+        <a href="/festivals-malta" style="color:#94a3b8;margin:0 8px">Festivals</a> &middot;
+        <a href="/theatre-shows-malta" style="color:#94a3b8;margin:0 8px">Theatre & Shows</a> &middot;
+        <a href="/arts-culture-malta" style="color:#94a3b8;margin:0 8px">Arts & Culture</a> &middot;
+        <a href="/sports-events-malta" style="color:#94a3b8;margin:0 8px">Sports</a> &middot;
+        <a href="/food-drink-events-malta" style="color:#94a3b8;margin:0 8px">Food & Drink</a> &middot;
+        <a href="/family-events-malta" style="color:#94a3b8;margin:0 8px">Family</a> &middot;
+        <a href="/free-events-malta" style="color:#94a3b8;margin:0 8px">Free Events</a>
+      </div>
+      <p style="margin-top:15px;font-size:0.75rem;color:#64748b">&copy; ${new Date().getFullYear()} maltaeventguide.com &middot; Events sourced from ShowsHappening, VisitMalta, Resident Advisor, EventWorks and local organizers</p>
       <p style="margin-top:8px;font-size:0.75rem;color:#64748b">Powered by <a href="https://bugrayildirim.me/" target="_blank" style="color:#94a3b8;text-decoration:underline">Bugra</a> &middot; <a href="mailto:hello@bugrayildirim.me" style="color:#94a3b8;text-decoration:underline">hello@bugrayildirim.me</a></p>
     </div>
   </footer>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "Malta Event Guide",
+    "url": "https://maltaeventguide.com",
+    "description": "Your complete guide to events in Malta and Gozo",
+    "areaServed": {
+      "@type": "Country",
+      "name": "Malta"
+    }
+  }
+  </script>
 
   <div id="scrollTop" onclick="window.scrollTo({top:0,behavior:'smooth'})" style="position:fixed;bottom:30px;right:30px;width:48px;height:48px;background:#0f172a;color:white;border-radius:50%;display:none;align-items:center;justify-content:center;cursor:pointer;font-size:1.3rem;box-shadow:0 4px 15px rgba(0,0,0,0.3);z-index:999;transition:opacity 0.3s,transform 0.3s" onmouseover="this.style.background='#FF385C'" onmouseout="this.style.background='#0f172a'">↑</div>
   <script>
@@ -885,6 +1029,7 @@ app.get('/event/:slug', async (req, res) => {
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="${desc.replace(/"/g, '&quot;')} — ${dateStr} at ${loc}. Find event details on Malta Event Guide.">
   <meta name="robots" content="index, follow">
+  <meta property="article:modified_time" content="${new Date().toISOString()}">
   <link rel="canonical" href="https://maltaeventguide.com/event/${slug}">
 
   <meta property="og:type" content="event">
@@ -978,7 +1123,7 @@ app.get('/event/:slug', async (req, res) => {
   <div class="wrapper">
     <div class="event-layout">
       <div class="event-img">
-        ${hasImg ? '<img src="' + img + '" alt="' + title.replace(/"/g, '&quot;') + '" onerror="this.style.display=\'none\'">' : ''}
+        ${hasImg ? '<img src="' + img + '" alt="' + title.replace(/"/g, '&quot;') + ' event in ' + loc.replace(/"/g, '&quot;') + ', Malta" onerror="this.style.display=\'none\'">' : ''}
         <div class="fallback" style="background:${bgStyle};${hasImg ? 'z-index:-1;' : ''}">${firstLetter}</div>
       </div>
       <div class="event-details">
