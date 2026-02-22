@@ -2196,6 +2196,19 @@ function igGenSingle(){
       ctx.fillText('📍 '+(e.location||'Malta'),540,locY);
     }
 
+    // Recurring badge
+    if(e.recurring){
+      var recurY=(e.location?(e.event_date?titleY+lines.length*62+120:titleY+lines.length*62+70):(e.event_date?titleY+lines.length*62+80:titleY+lines.length*62+30));
+      ctx.font='600 24px Outfit, sans-serif';
+      var recurText='🔁 '+e.recurring;
+      var recurW=ctx.measureText(recurText).width+30;
+      ctx.fillStyle='rgba(29,78,216,0.2)';
+      igRoundRect(ctx,540-recurW/2,recurY-8,recurW,40,20);
+      ctx.fill();
+      ctx.fillStyle='#60a5fa';
+      ctx.fillText(recurText,540,recurY+22);
+    }
+
     // Category pill
     if(e.category){
       ctx.font='500 20px Outfit, sans-serif';
@@ -2349,7 +2362,9 @@ function igGenMulti(type){
     // Date & location
     ctx.font='400 22px Outfit, sans-serif';
     ctx.fillStyle='#94a3b8';
-    ctx.fillText((e.event_date||'TBA')+' · '+(e.location||'Malta'),160,y+90);
+    var metaText=(e.event_date||'TBA')+' · '+(e.location||'Malta');
+    if(e.recurring) metaText+=' · 🔁 '+e.recurring;
+    ctx.fillText(metaText,160,y+90);
 
     // Category pill
     if(e.category){
@@ -2390,6 +2405,7 @@ function igGenMulti(type){
 function igSetCaption(e){
   var cap='🎤 '+e.title+'\\n\\n';
   if(e.event_date)cap+='📅 '+e.event_date+'\\n';
+  if(e.recurring)cap+='🔁 '+e.recurring+'\\n';
   if(e.location)cap+='📍 '+e.location+'\\n';
   if(e.description){
     var d=e.description.length>200?e.description.substring(0,200)+'...':e.description;
