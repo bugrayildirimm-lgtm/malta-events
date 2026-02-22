@@ -1612,7 +1612,21 @@ app.get('/admin', (req, res) => {
             <label style="display:block;color:#94a3b8;font-size:0.8rem;margin-bottom:4px">Search Event</label>
             <input type="text" id="igSearch" placeholder="Type event name..." oninput="igFilterEvents()" style="width:100%;padding:10px;border-radius:8px;border:1px solid #334155;background:#1e293b;color:white;font-family:inherit;box-sizing:border-box">
           </div>
-          <div id="igEventList" style="max-height:300px;overflow-y:auto;border-radius:8px;background:#1e293b"></div>
+          <div id="igEventList" style="max-height:200px;overflow-y:auto;border-radius:8px;background:#1e293b"></div>
+          
+          <div style="margin-top:12px">
+            <label style="display:block;color:#94a3b8;font-size:0.8rem;margin-bottom:4px">Event Image</label>
+            <div id="igImageDrop" style="border:2px dashed #334155;border-radius:10px;padding:20px;text-align:center;cursor:pointer;transition:0.2s;position:relative" onclick="document.getElementById('igImageFile').click()" ondragover="event.preventDefault();this.style.borderColor='#FF385C'" ondragleave="this.style.borderColor='#334155'" ondrop="event.preventDefault();this.style.borderColor='#334155';igHandleFile(event.dataTransfer.files[0])">
+              <input type="file" id="igImageFile" accept="image/*" onchange="igHandleFile(this.files[0])" style="display:none">
+              <div id="igImagePreview" style="display:none;margin-bottom:8px"><img id="igImageThumb" style="max-height:120px;border-radius:8px"></div>
+              <div id="igImagePrompt">
+                <div style="color:#64748b;font-size:2rem;margin-bottom:6px">🖼️</div>
+                <div style="color:#94a3b8;font-size:0.85rem;font-weight:600">Drop image, click to browse, or paste</div>
+                <div style="color:#475569;font-size:0.75rem;margin-top:4px">Supports JPG, PNG, WebP</div>
+              </div>
+            </div>
+            <div id="igImageStatus" style="margin-top:6px;font-size:0.8rem;color:#4ade80;display:none"></div>
+          </div>
         </div>
 
         <div id="igMultiControls" style="display:none">
@@ -2037,6 +2051,7 @@ function toast(m,e){var t=document.getElementById('toast');t.textContent=m;t.cla
 // ========== INSTAGRAM POST GENERATOR ==========
 var igSelectedEvent=null;
 var igLogoImg=null;
+var igCustomImage=null; // Stores uploaded/pasted image as data URL
 
 function igInit(){
   if(!igLogoImg){
@@ -2044,8 +2059,37 @@ function igInit(){
     igLogoImg.crossOrigin='anonymous';
     igLogoImg.src='/logo.png';
   }
+  // Listen for paste anywhere when on instagram tab
+  document.addEventListener('paste',function(ev){
+    if(tab!=='instagram')return;
+    var items=ev.clipboardData&&ev.clipboardData.items;
+    if(!items)return;
+    for(var i=0;i<items.length;i++){
+      if(items[i].type.indexOf('image')>=0){
+        igHandleFile(items[i].getAsFile());
+        break;
+      }
+    }
+  });
   igTemplateChange();
   igDrawEmpty();
+}
+
+function igHandleFile(file){
+  if(!file||file.type.indexOf('image')<0)return;
+  var reader=new FileReader();
+  reader.onload=function(ev){
+    igCustomImage=ev.target.result;
+    // Show thumbnail
+    document.getElementById('igImageThumb').src=igCustomImage;
+    document.getElementById('igImagePreview').style.display='';
+    document.getElementById('igImagePrompt').style.display='none';
+    document.getElementById('igImageStatus').style.display='';
+    document.getElementById('igImageStatus').textContent='✓ Image loaded — '+file.name;
+    // Auto-generate if event is selected
+    if(igSelectedEvent)igGenerate();
+  };
+  reader.readAsDataURL(file);
 }
 
 function igTemplateChange(){
@@ -2070,9 +2114,12 @@ function igFilterEvents(){
 
 function igSelectEvent(id){
   igSelectedEvent=E.find(function(e){return e.id===id});
+  igCustomImage=null;
+  document.getElementById('igImagePreview').style.display='none';
+  document.getElementById('igImagePrompt').style.display='';
+  document.getElementById('igImageStatus').style.display='none';
   document.getElementById('igSearch').value=igSelectedEvent.title;
   document.getElementById('igEventList').innerHTML='<div style="padding:10px;color:#4ade80;font-size:0.85rem">✓ Selected: '+esc(igSelectedEvent.title)+'</div>';
-  igGenerate();
 }
 
 function igDrawEmpty(){
@@ -2178,8 +2225,15 @@ function igGenSingle(){
     igSetCaption(e);
   };
 
-  // Try loading event image
-  if(e.image_url&&e.image_url.indexOf('http')===0){
+  // Load image: custom upload first, then proxy, then placeholder
+  var imgSrc=null;
+  if(igCustomImage){
+    imgSrc=igCustomImage;
+  } else if(e.image_url&&e.image_url.indexOf('http')===0){
+    imgSrc='/admin/api/proxy-image?url='+encodeURIComponent(e.image_url);
+  }
+
+  if(imgSrc){
     var img=new Image();
     img.crossOrigin='anonymous';
     img.onload=function(){
@@ -2205,8 +2259,7 @@ function igGenSingle(){
       afterImage();
     };
     img.onerror=function(){afterImage()};
-    // Always proxy to avoid CORS canvas tainting
-    img.src='/admin/api/proxy-image?url='+encodeURIComponent(e.image_url);
+    img.src=imgSrc;
   } else {
     // No image - draw placeholder
     ctx.fillStyle='#1e293b';
