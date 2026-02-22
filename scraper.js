@@ -533,6 +533,124 @@ async function scrapeResidentAdvisor() {
   }
 }
 
+// --- 4. EVENTWORKS.MT ---
+async function scrapeEventWorks() {
+  try {
+    console.log("EventWorks scraping...");
+    
+    const fetch = (await import('node-fetch')).default;
+    const response = await fetch('https://eventworks.mt/all-events/', {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      }
+    });
+    
+    if (!response.ok) {
+      console.error(`  EventWorks: HTTP ${response.status}`);
+      return;
+    }
+    
+    const html = await response.text();
+    
+    // Parse events from HTML - each event is an <a> tag with date, title, venue, price
+    const eventRegex = /\[([A-Za-z]{3})\s*(\d{1,2})\s*(.*?)\s*((?:From\s*[€£][\d,.N\/A]+)?)\]\(([^)]+)\)/g;
+    
+    // Alternative: parse the actual HTML structure
+    // Events appear as: <a href="/slug">month day title venue price</a>
+    const events = [];
+    
+    // Match pattern: [Mon DD\n\nTitle\n\nVenue\n\nFrom €XX.XX](/slug)
+    const blocks = html.split(/\[(?=(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s)/i);
+    
+    for (let i = 1; i < blocks.length; i++) {
+      const block = blocks[i];
+      const linkMatch = block.match(/\]\(([^)]+)\)/);
+      if (!linkMatch) continue;
+      
+      const slug = linkMatch[1];
+      const content = block.substring(0, block.indexOf(']('));
+      const lines = content.split('\n').map(l => l.trim()).filter(Boolean);
+      
+      if (lines.length < 3) continue;
+      
+      // First line: "Feb 22" or "Mar 07"
+      const dateMatch = lines[0].match(/^([A-Za-z]{3})\s*(\d{1,2})$/i);
+      if (!dateMatch) continue;
+      
+      const month = dateMatch[1];
+      const day = dateMatch[2];
+      const dateText = `${day} ${month}`;
+      
+      const title = lines[1] || '';
+      const venue = lines[2] || 'Malta';
+      
+      // Check for price
+      let price = '';
+      if (lines.length > 3) {
+        const priceLine = lines.find(l => l.startsWith('From'));
+        if (priceLine) price = priceLine;
+      }
+      
+      // Skip non-Malta events
+      if (venue.toLowerCase().includes('bournemouth') || venue.toLowerCase().includes('amsterdam') || venue.toLowerCase().includes('london')) {
+        console.log(`  Skipping non-Malta event: ${title} at ${venue}`);
+        continue;
+      }
+      
+      const sourceUrl = slug.startsWith('http') ? slug : `https://eventworks.mt${slug}`;
+      
+      events.push({
+        title,
+        date: dateText,
+        location: venue,
+        url: sourceUrl,
+        description: price || null
+      });
+    }
+    
+    console.log(`  EventWorks: ${events.length} Malta events found. Saving...`);
+    
+    for (const event of events) {
+      try {
+        await pool.query(
+          `INSERT INTO events (title, location, source_url, image_url, event_date, description, category, source_name) 
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
+           ON CONFLICT (source_url) DO UPDATE SET 
+             title = EXCLUDED.title,
+             event_date = COALESCE(EXCLUDED.event_date, events.event_date),
+             description = COALESCE(EXCLUDED.description, events.description)`,
+          [event.title, event.location, event.url, null, event.date, event.description, 'Nightlife & Parties', 'EventWorks']
+        );
+      } catch (dbErr) {
+        if (dbErr.message.includes('column')) {
+          try {
+            await pool.query(
+              'INSERT INTO events (title, location, source_url) VALUES ($1, $2, $3) ON CONFLICT (source_url) DO NOTHING',
+              [event.title, event.location, event.url]
+            );
+          } catch(e) {}
+        } else {
+          console.error(`  DB error (${event.title}):`, dbErr.message);
+        }
+      }
+    }
+    
+    if (events.length > 0) {
+      console.log("\n  === EVENTWORKS SAMPLE EVENTS ===");
+      events.slice(0, 5).forEach(e => {
+        console.log(`  Title:    ${e.title}`);
+        console.log(`  Date:     ${e.date}`);
+        console.log(`  Venue:    ${e.location}`);
+        console.log(`  URL:      ${e.url}`);
+        console.log(`  ---`);
+      });
+    }
+    
+  } catch (err) {
+    console.error("EventWorks Error:", err.message);
+  }
+}
+
 // --- RUN ---
 async function run() {
   console.log("=== Event Scraper Starting ===\n");
@@ -548,6 +666,8 @@ async function run() {
     await scrapeVisitMalta();
     console.log("\n---\n");
     await scrapeResidentAdvisor();
+    console.log("\n---\n");
+    await scrapeEventWorks();
   } finally {
     await browser.close();
     await pool.end();
