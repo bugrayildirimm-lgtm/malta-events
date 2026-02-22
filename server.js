@@ -2204,15 +2204,9 @@ function igGenSingle(){
       
       afterImage();
     };
-    img.onerror=function(){
-      // CORS failed - try proxy
-      if(img.src.indexOf('/admin/api/proxy-image')<0){
-        img.src='/admin/api/proxy-image?url='+encodeURIComponent(e.image_url);
-      } else {
-        afterImage();
-      }
-    };
-    img.src=e.image_url;
+    img.onerror=function(){afterImage()};
+    // Always proxy to avoid CORS canvas tainting
+    img.src='/admin/api/proxy-image?url='+encodeURIComponent(e.image_url);
   } else {
     // No image - draw placeholder
     ctx.fillStyle='#1e293b';
@@ -2399,15 +2393,25 @@ app.get('/admin/api/proxy-image', async (req, res) => {
   const url = req.query.url;
   if (!url) return res.status(400).send('Missing url');
   try {
-    const fetch = (await import('node-fetch')).default;
-    const response = await fetch(url, { timeout: 10000, headers: { 'User-Agent': 'Mozilla/5.0' } });
-    if (!response.ok) return res.status(404).send('Image not found');
-    const contentType = response.headers.get('content-type') || 'image/jpeg';
-    const buffer = await response.buffer();
-    res.type(contentType).set({
-      'Cache-Control': 'public, max-age=3600',
-      'Access-Control-Allow-Origin': '*'
-    }).send(buffer);
+    const https = require('https');
+    const http = require('http');
+    const mod = url.startsWith('https') ? https : http;
+    
+    mod.get(url, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible)' }, timeout: 10000 }, (imgRes) => {
+      if (imgRes.statusCode >= 300 && imgRes.statusCode < 400 && imgRes.headers.location) {
+        // Follow redirect
+        mod.get(imgRes.headers.location, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible)' } }, (imgRes2) => {
+          res.type(imgRes2.headers['content-type'] || 'image/jpeg');
+          res.set({ 'Cache-Control': 'public, max-age=3600', 'Access-Control-Allow-Origin': '*' });
+          imgRes2.pipe(res);
+        }).on('error', () => res.status(500).send('Failed'));
+        return;
+      }
+      if (imgRes.statusCode !== 200) return res.status(404).send('Not found');
+      res.type(imgRes.headers['content-type'] || 'image/jpeg');
+      res.set({ 'Cache-Control': 'public, max-age=3600', 'Access-Control-Allow-Origin': '*' });
+      imgRes.pipe(res);
+    }).on('error', () => res.status(500).send('Failed'));
   } catch (e) {
     res.status(500).send('Failed to fetch image');
   }
