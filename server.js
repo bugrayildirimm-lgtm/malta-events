@@ -262,6 +262,22 @@ const createCard = (event, isPast) => {
 
 
 // =====================================================================
+// STATIC ASSETS
+// =====================================================================
+const fs = require('fs');
+const path = require('path');
+let logoBuffer = null;
+try { logoBuffer = fs.readFileSync(path.join(__dirname, 'logo.png')); } catch(e) { console.log('logo.png not found, using text fallback'); }
+
+app.get('/logo.png', (req, res) => {
+  if (logoBuffer) {
+    res.type('image/png').set('Cache-Control', 'public, max-age=604800').send(logoBuffer);
+  } else {
+    res.status(404).send('Not found');
+  }
+});
+
+// =====================================================================
 // SEO ROUTES
 // =====================================================================
 app.get('/robots.txt', (req, res) => {
@@ -384,7 +400,7 @@ Object.entries(categoryPages).forEach(([slug, config]) => {
 </head>
 <body>
   <div class="nav">
-    <a href="/">Malta Event Guide</a>
+    <a href="/" style="display:flex;align-items:center;gap:10px"><img src="/logo.png" alt="Malta Event Guide" style="height:34px;border-radius:5px"></a>
     <a href="/" class="back">← All Events</a>
   </div>
   <div class="hero">
@@ -661,6 +677,17 @@ app.get('/', async (req, res) => {
   </style>
 </head>
 <body>
+  <nav style="background:#0f172a;padding:10px 24px;display:flex;align-items:center;justify-content:space-between;position:relative;z-index:20">
+    <a href="/" style="display:flex;align-items:center;gap:10px;text-decoration:none">
+      <img src="/logo.png" alt="Malta Event Guide" style="height:40px;border-radius:6px">
+    </a>
+    <div style="display:flex;align-items:center;gap:16px">
+      <a href="https://www.instagram.com/maltaeventguide/" target="_blank" rel="noopener" style="color:#94a3b8;font-size:0.85rem;text-decoration:none;display:flex;align-items:center;gap:5px;transition:0.2s" onmouseover="this.style.color='#FF385C'" onmouseout="this.style.color='#94a3b8'">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
+        Follow us
+      </a>
+    </div>
+  </nav>
   <header>
     <div class="header-overlay"></div>
     <div class="header-content">
@@ -903,7 +930,7 @@ app.get('/', async (req, res) => {
         <a href="/free-events-malta" style="color:#94a3b8;margin:0 8px">Free Events</a>
       </div>
       <p style="margin-top:15px;font-size:0.75rem;color:#64748b">&copy; ${new Date().getFullYear()} maltaeventguide.com &middot; Events sourced from ShowsHappening, VisitMalta, Resident Advisor, EventWorks and local organizers</p>
-      <p style="margin-top:8px;font-size:0.75rem;color:#64748b">Powered by <a href="https://bugrayildirim.me/" target="_blank" style="color:#94a3b8;text-decoration:underline">Bugra</a> &middot; <a href="mailto:hello@bugrayildirim.me" style="color:#94a3b8;text-decoration:underline">hello@bugrayildirim.me</a></p>
+      <p style="margin-top:8px;font-size:0.75rem;color:#64748b">Powered by <a href="https://bugrayildirim.me/" target="_blank" style="color:#94a3b8;text-decoration:underline">Bugra</a> &middot; <a href="mailto:hello@bugrayildirim.me" style="color:#94a3b8;text-decoration:underline">hello@bugrayildirim.me</a> &middot; <a href="https://www.instagram.com/maltaeventguide/" target="_blank" style="color:#94a3b8;text-decoration:underline">Instagram</a></p>
     </div>
   </footer>
   <script type="application/ld+json">
@@ -913,6 +940,8 @@ app.get('/', async (req, res) => {
     "name": "Malta Event Guide",
     "url": "https://maltaeventguide.com",
     "description": "Your complete guide to events in Malta and Gozo",
+    "logo": "https://maltaeventguide.com/logo.png",
+    "sameAs": ["https://www.instagram.com/maltaeventguide/"],
     "areaServed": {
       "@type": "Country",
       "name": "Malta"
@@ -1116,8 +1145,11 @@ app.get('/event/:slug', async (req, res) => {
 </head>
 <body>
   <nav class="nav">
-    <a href="/">Malta Events Guide</a>
-    <a href="/" class="back">← All Events</a>
+    <a href="/" style="display:flex;align-items:center;gap:10px"><img src="/logo.png" alt="Malta Event Guide" style="height:34px;border-radius:5px"></a>
+    <div style="display:flex;align-items:center;gap:14px;margin-left:auto">
+      <a href="https://www.instagram.com/maltaeventguide/" target="_blank" rel="noopener" style="color:#94a3b8;display:flex;align-items:center" title="Follow on Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg></a>
+      <a href="/" class="back">← All Events</a>
+    </div>
   </nav>
 
   <div class="wrapper">
