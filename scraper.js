@@ -551,65 +551,72 @@ async function scrapeEventWorks() {
     }
     
     const html = await response.text();
+    console.log(`  EventWorks: Page loaded (${html.length} chars)`);
     
-    // Parse events from HTML - each event is an <a> tag with date, title, venue, price
-    const eventRegex = /\[([A-Za-z]{3})\s*(\d{1,2})\s*(.*?)\s*((?:From\s*[€£][\d,.N\/A]+)?)\]\(([^)]+)\)/g;
-    
-    // Alternative: parse the actual HTML structure
-    // Events appear as: <a href="/slug">month day title venue price</a>
     const events = [];
     
-    // Match pattern: [Mon DD\n\nTitle\n\nVenue\n\nFrom €XX.XX](/slug)
-    const blocks = html.split(/\[(?=(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s)/i);
+    // Split by event blocks: each starts with <div class="search-event-holder
+    const blocks = html.split(/search-event-holder/);
     
     for (let i = 1; i < blocks.length; i++) {
       const block = blocks[i];
-      const linkMatch = block.match(/\]\(([^)]+)\)/);
-      if (!linkMatch) continue;
       
-      const slug = linkMatch[1];
-      const content = block.substring(0, block.indexOf(']('));
-      const lines = content.split('\n').map(l => l.trim()).filter(Boolean);
+      // Extract href
+      const hrefMatch = block.match(/<a\s+href=["']([^"']+)["']/);
+      if (!hrefMatch) continue;
+      const href = hrefMatch[1];
       
-      if (lines.length < 3) continue;
+      // Skip external/non-event links
+      if (href.startsWith('http') || href.startsWith('#') || href.length < 3) continue;
       
-      // First line: "Feb 22" or "Mar 07"
-      const dateMatch = lines[0].match(/^([A-Za-z]{3})\s*(\d{1,2})$/i);
-      if (!dateMatch) continue;
+      // Extract image URL from background-image or --bg-image
+      let imageUrl = null;
+      const imgMatch = block.match(/url\(['"]?(https:\/\/s3[^'")\s]+)['"]?\)/);
+      if (imgMatch) imageUrl = imgMatch[1];
       
-      const month = dateMatch[1];
-      const day = dateMatch[2];
-      const dateText = `${day} ${month}`;
+      // Extract month and day
+      const monthMatch = block.match(/<span\s+class=["']month["']>\s*(.*?)\s*<\/span>/);
+      const dayMatch = block.match(/<span\s+class=["']day["']>\s*(.*?)\s*<\/span>/);
+      if (!monthMatch || !dayMatch) continue;
+      const dateText = `${dayMatch[1]} ${monthMatch[1]}`;
       
-      const title = lines[1] || '';
-      const venue = lines[2] || 'Malta';
+      // Extract title
+      const titleMatch = block.match(/<div\s+class=["']event-title["']>\s*(.*?)\s*<\/div>/);
+      if (!titleMatch) continue;
+      const title = titleMatch[1].trim();
       
-      // Check for price
-      let price = '';
-      if (lines.length > 3) {
-        const priceLine = lines.find(l => l.startsWith('From'));
-        if (priceLine) price = priceLine;
-      }
+      // Extract location
+      const locMatch = block.match(/<div\s+class=["']event-location["']>\s*(.*?)\s*<\/div>/);
+      const location = locMatch ? locMatch[1].trim() : 'Malta';
+      
+      // Extract price
+      const priceMatch = block.match(/<div\s+class=["']event-price-range["']>\s*(.*?)\s*<\/div>/);
+      const price = priceMatch ? priceMatch[1].trim() : '';
       
       // Skip non-Malta events
-      if (venue.toLowerCase().includes('bournemouth') || venue.toLowerCase().includes('amsterdam') || venue.toLowerCase().includes('london')) {
-        console.log(`  Skipping non-Malta event: ${title} at ${venue}`);
+      const locLower = location.toLowerCase();
+      if (locLower.includes('bournemouth') || locLower.includes('amsterdam') || locLower.includes('london') || locLower.includes('manchester')) {
+        console.log(`  Skipping non-Malta: ${title}`);
         continue;
       }
       
-      const sourceUrl = slug.startsWith('http') ? slug : `https://eventworks.mt${slug}`;
+      const sourceUrl = `https://eventworks.mt${href}`;
+      
+      if (events.some(e => e.url === sourceUrl)) continue;
       
       events.push({
         title,
         date: dateText,
-        location: venue,
+        location,
         url: sourceUrl,
-        description: price || null
+        image_url: imageUrl,
+        description: (price && price !== 'From €N/A') ? price : null
       });
     }
     
     console.log(`  EventWorks: ${events.length} Malta events found. Saving...`);
     
+    let saved = 0;
     for (const event of events) {
       try {
         await pool.query(
@@ -617,17 +624,20 @@ async function scrapeEventWorks() {
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
            ON CONFLICT (source_url) DO UPDATE SET 
              title = EXCLUDED.title,
+             image_url = COALESCE(EXCLUDED.image_url, events.image_url),
              event_date = COALESCE(EXCLUDED.event_date, events.event_date),
              description = COALESCE(EXCLUDED.description, events.description)`,
-          [event.title, event.location, event.url, null, event.date, event.description, 'Nightlife & Parties', 'EventWorks']
+          [event.title, event.location, event.url, event.image_url, event.date, event.description, 'Nightlife & Parties', 'EventWorks']
         );
+        saved++;
       } catch (dbErr) {
         if (dbErr.message.includes('column')) {
           try {
             await pool.query(
-              'INSERT INTO events (title, location, source_url) VALUES ($1, $2, $3) ON CONFLICT (source_url) DO NOTHING',
-              [event.title, event.location, event.url]
+              'INSERT INTO events (title, location, source_url, image_url) VALUES ($1, $2, $3, $4) ON CONFLICT (source_url) DO NOTHING',
+              [event.title, event.location, event.url, event.image_url]
             );
+            saved++;
           } catch(e) {}
         } else {
           console.error(`  DB error (${event.title}):`, dbErr.message);
@@ -635,12 +645,15 @@ async function scrapeEventWorks() {
       }
     }
     
+    console.log(`  EventWorks: ${saved} events saved/updated`);
+    
     if (events.length > 0) {
       console.log("\n  === EVENTWORKS SAMPLE EVENTS ===");
       events.slice(0, 5).forEach(e => {
         console.log(`  Title:    ${e.title}`);
         console.log(`  Date:     ${e.date}`);
         console.log(`  Venue:    ${e.location}`);
+        console.log(`  Image:    ${e.image_url ? 'YES' : 'NO'}`);
         console.log(`  URL:      ${e.url}`);
         console.log(`  ---`);
       });
