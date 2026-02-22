@@ -2,6 +2,8 @@ require('dotenv').config();
 const express = require('express');
 const { Pool } = require('pg');
 const cors = require('cors');
+const multer = require('multer');
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 const app = express();
 app.use(cors());
@@ -40,6 +42,7 @@ pool.query('ALTER TABLE events ADD COLUMN IF NOT EXISTS category TEXT').catch(()
 pool.query('ALTER TABLE events ADD COLUMN IF NOT EXISTS source_name TEXT').catch(()=>{});
 pool.query('ALTER TABLE events ADD COLUMN IF NOT EXISTS recurring TEXT').catch(()=>{});
 pool.query('ALTER TABLE events ADD COLUMN IF NOT EXISTS slug TEXT').catch(()=>{});
+pool.query("ALTER TABLE events ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'live'").catch(()=>{});
 
 pool.query(`CREATE TABLE IF NOT EXISTS email_subscribers (
   id SERIAL PRIMARY KEY,
@@ -356,9 +359,9 @@ Object.entries(categoryPages).forEach(([slug, config]) => {
     try {
       let events;
       if (config.cat === '_free') {
-        events = await pool.query("SELECT * FROM events WHERE LOWER(description) LIKE '%free%' OR LOWER(title) LIKE '%free%' ORDER BY id DESC LIMIT 50");
+        events = await pool.query("SELECT * FROM events WHERE (LOWER(description) LIKE '%free%' OR LOWER(title) LIKE '%free%') AND COALESCE(status,'live')='live' ORDER BY id DESC LIMIT 50");
       } else {
-        events = await pool.query('SELECT * FROM events WHERE category = $1 ORDER BY id DESC LIMIT 50', [config.cat]);
+        events = await pool.query("SELECT * FROM events WHERE category = $1 AND COALESCE(status,'live')='live' ORDER BY id DESC LIMIT 50", [config.cat]);
       }
       const rows = events.rows;
 
@@ -472,7 +475,7 @@ app.get('/', async (req, res) => {
       `);
     } catch(e) { /* table may not exist yet, that's ok */ }
 
-    const result = await pool.query('SELECT * FROM events');
+    const result = await pool.query("SELECT * FROM events WHERE COALESCE(status, 'live') = 'live'");
     const allEvents = result.rows;
     const today = new Date(); today.setHours(0,0,0,0);
 
@@ -1432,6 +1435,7 @@ app.get('/admin', (req, res) => {
       <div class="tab" onclick="switchTab('categories',this)">🏷️ Categories <span class="tc" id="cc">0</span></div>
       <div class="tab" onclick="switchTab('manage',this)">📋 Manage</div>
       <div class="tab" onclick="switchTab('add',this)">➕ Add Event</div>
+      <div class="tab" onclick="switchTab('upload',this)">📤 Upload</div>
       <div class="tab" onclick="switchTab('analytics',this)">📊 Analytics</div>
       <div class="tab" onclick="switchTab('instagram',this)">📸 Instagram</div>
     </div>
@@ -1546,6 +1550,43 @@ app.get('/admin', (req, res) => {
         <div class="form-group"><label>Event/Ticket URL <span class="req">*</span></label><input type="text" id="ae_url" placeholder="https://... link to event page or ticket sales"><div class="hint">The link users will go to when they click Details</div></div>
         <div class="form-group"><label>Description</label><textarea id="ae_desc" placeholder="Brief description of the event..."></textarea></div>
         <button class="form-btn" onclick="addEvent()">Add Event</button>
+      </div>
+    </div>
+
+    <!-- UPLOAD TAB -->
+    <div id="uploadTab" style="display:none">
+      <div style="display:flex;gap:20px;flex-wrap:wrap">
+        <!-- Upload Section -->
+        <div style="flex:1;min-width:300px">
+          <h3 style="color:white;margin:0 0 15px">📤 Upload Events from Excel</h3>
+          <div id="xlDrop" style="border:2px dashed #334155;border-radius:12px;padding:30px;text-align:center;cursor:pointer;transition:0.2s;margin-bottom:15px" onclick="document.getElementById('xlFile').click()" ondragover="event.preventDefault();this.style.borderColor='#FF385C'" ondragleave="this.style.borderColor='#334155'" ondrop="event.preventDefault();this.style.borderColor='#334155';xlHandleFile(event.dataTransfer.files[0])">
+            <input type="file" id="xlFile" accept=".xlsx,.xls,.csv" onchange="xlHandleFile(this.files[0])" style="display:none">
+            <div style="color:#64748b;font-size:2.5rem;margin-bottom:8px">📊</div>
+            <div style="color:#94a3b8;font-size:0.95rem;font-weight:600">Drop Excel file here or click to browse</div>
+            <div style="color:#475569;font-size:0.8rem;margin-top:6px">Supports .xlsx files · Events will be imported as drafts</div>
+          </div>
+          <div id="xlStatus" style="display:none;padding:12px;background:#1e293b;border-radius:8px;margin-bottom:15px">
+            <div id="xlStatusText" style="color:#94a3b8;font-size:0.85rem"></div>
+          </div>
+          <div id="xlPreview" style="display:none;background:#1e293b;border-radius:12px;padding:15px;max-height:400px;overflow-y:auto">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+              <h4 style="color:white;margin:0">Preview</h4>
+              <button onclick="xlImport()" style="padding:8px 20px;border-radius:8px;border:none;background:#22c55e;color:white;font-weight:700;font-family:inherit;cursor:pointer">Import as Drafts</button>
+            </div>
+            <div id="xlRows"></div>
+          </div>
+        </div>
+        
+        <!-- Drafts Section -->
+        <div style="flex:1;min-width:300px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px">
+            <h3 style="color:white;margin:0">📝 Draft Events</h3>
+            <button onclick="loadDrafts()" style="padding:6px 14px;border-radius:8px;border:1px solid #334155;background:transparent;color:#94a3b8;font-family:inherit;cursor:pointer;font-size:0.8rem">↻ Refresh</button>
+          </div>
+          <div id="draftList" style="max-height:600px;overflow-y:auto">
+            <div style="color:#64748b;font-size:0.85rem;padding:20px;text-align:center">Switch to this tab to load drafts</div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -1700,11 +1741,12 @@ function switchTab(t,el){
   tab=t;
   document.querySelectorAll('.tab').forEach(function(x){x.classList.remove('active')});
   el.classList.add('active');
-  ['imagesTab','datesTab','categoriesTab','manageTab','addTab','analyticsTab','instagramTab'].forEach(function(id){document.getElementById(id).style.display='none'});
-  var map={images:'imagesTab',dates:'datesTab',categories:'categoriesTab',manage:'manageTab',add:'addTab',analytics:'analyticsTab',instagram:'instagramTab'};
+  ['imagesTab','datesTab','categoriesTab','manageTab','addTab','uploadTab','analyticsTab','instagramTab'].forEach(function(id){document.getElementById(id).style.display='none'});
+  var map={images:'imagesTab',dates:'datesTab',categories:'categoriesTab',manage:'manageTab',add:'addTab',upload:'uploadTab',analytics:'analyticsTab',instagram:'instagramTab'};
   document.getElementById(map[t]).style.display='';
   if(t==='analytics')loadAnalytics();
   if(t==='instagram')igInit();
+  if(t==='upload')loadDrafts();
 }
 function ssf(f,b){sf1v=f;document.querySelectorAll('#imagesTab .fb').forEach(function(x){x.classList.remove('active')});b.classList.add('active');af1()}
 function af1(){
@@ -2047,6 +2089,166 @@ function api(method,url,body,cb){
     .then(function(r){if(!r.ok)throw 0;return r.json()}).then(cb).catch(function(){toast('Failed',1)});
 }
 function toast(m,e){var t=document.getElementById('toast');t.textContent=m;t.className='toast show'+(e?' err':'');setTimeout(function(){t.className='toast'},3000)}
+
+// ========== EXCEL UPLOAD & DRAFTS ==========
+var xlParsedEvents=[];
+
+function xlHandleFile(file){
+  if(!file)return;
+  var status=document.getElementById('xlStatus');
+  var statusText=document.getElementById('xlStatusText');
+  status.style.display='';
+  statusText.textContent='Reading file...';
+  statusText.style.color='#94a3b8';
+  
+  var reader=new FileReader();
+  reader.onload=function(ev){
+    try{
+      xlParseXLSX(new Uint8Array(ev.target.result));
+    }catch(err){
+      statusText.textContent='Error reading file: '+err.message;
+      statusText.style.color='#f87171';
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function xlParseXLSX(data){
+  // Send to server for parsing since we need xlsx library
+  var formData=new FormData();
+  formData.append('file',new Blob([data]),'events.xlsx');
+  
+  fetch('/admin/api/parse-excel',{method:'POST',headers:{Authorization:auth},body:formData})
+    .then(function(r){return r.json()})
+    .then(function(d){
+      if(d.error){
+        document.getElementById('xlStatusText').textContent='Error: '+d.error;
+        document.getElementById('xlStatusText').style.color='#f87171';
+        return;
+      }
+      xlParsedEvents=d.events;
+      document.getElementById('xlStatusText').textContent='Found '+d.events.length+' events in file';
+      document.getElementById('xlStatusText').style.color='#4ade80';
+      document.getElementById('xlPreview').style.display='';
+      
+      var html=d.events.map(function(e,i){
+        return '<div style="padding:10px 12px;border-bottom:1px solid #0f172a;font-size:0.85rem">'
+          +'<div style="display:flex;justify-content:space-between;align-items:start">'
+          +'<div><span style="color:white;font-weight:600">'+esc(e.title)+'</span></div>'
+          +'<span style="color:#475569;font-size:0.75rem">#'+(i+1)+'</span></div>'
+          +'<div style="color:#64748b;margin-top:4px;font-size:0.8rem">'
+          +(e.event_date?'📅 '+esc(e.event_date)+'  ':'')
+          +(e.location?'📍 '+esc(e.location)+'  ':'')
+          +(e.description?'💰 '+esc(e.description):'')
+          +'</div>'
+          +(e.source_url?'<div style="color:#475569;margin-top:2px;font-size:0.75rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">🔗 '+esc(e.source_url)+'</div>':'')
+          +'</div>';
+      }).join('');
+      document.getElementById('xlRows').innerHTML=html;
+    })
+    .catch(function(err){
+      document.getElementById('xlStatusText').textContent='Upload failed: '+err;
+      document.getElementById('xlStatusText').style.color='#f87171';
+    });
+}
+
+function xlImport(){
+  if(!xlParsedEvents.length)return toast('No events to import',1);
+  
+  fetch('/admin/api/import-drafts',{
+    method:'POST',
+    headers:{'Content-Type':'application/json',Authorization:auth},
+    body:JSON.stringify({events:xlParsedEvents})
+  })
+  .then(function(r){return r.json()})
+  .then(function(d){
+    if(d.ok){
+      toast(d.count+' events imported as drafts!');
+      xlParsedEvents=[];
+      document.getElementById('xlPreview').style.display='none';
+      document.getElementById('xlStatusText').textContent=d.count+' events imported as drafts ✓';
+      loadDrafts();
+      // Reload main event list
+      fetch('/admin/api/events',{headers:{Authorization:auth}}).then(function(r){return r.json()}).then(function(dd){E=dd;us()});
+    } else {
+      toast('Import failed: '+(d.error||'unknown'),1);
+    }
+  })
+  .catch(function(){toast('Import failed',1)});
+}
+
+function loadDrafts(){
+  fetch('/admin/api/drafts',{headers:{Authorization:auth}})
+    .then(function(r){return r.json()})
+    .then(function(drafts){
+      if(!drafts.length){
+        document.getElementById('draftList').innerHTML='<div style="color:#64748b;font-size:0.85rem;padding:20px;text-align:center">No draft events. Upload an Excel file to import events as drafts.</div>';
+        return;
+      }
+      var html=drafts.map(function(e){
+        var hasImg=e.image_url&&e.image_url.indexOf('http')===0;
+        var hasCat=!!e.category;
+        var hasDate=!!e.event_date;
+        var missing=[];
+        if(!hasImg)missing.push('image');
+        if(!hasCat)missing.push('category');
+        if(!hasDate)missing.push('date');
+        
+        return '<div style="padding:12px;background:#0f172a;border-radius:10px;margin-bottom:8px;border:1px solid #1e293b">'
+          +'<div style="display:flex;justify-content:space-between;align-items:start;gap:10px">'
+          +'<div style="flex:1;min-width:0">'
+          +'<div style="color:white;font-weight:600;font-size:0.9rem">'+esc(e.title)+'</div>'
+          +'<div style="color:#64748b;font-size:0.8rem;margin-top:4px">'
+          +(e.event_date||'No date')+' · '+(e.location||'No location')
+          +'</div>'
+          +(missing.length?'<div style="margin-top:4px"><span style="background:#422006;color:#fbbf24;padding:2px 8px;border-radius:10px;font-size:0.7rem;font-weight:600">Missing: '+missing.join(', ')+'</span></div>':'<div style="margin-top:4px"><span style="background:#052e16;color:#4ade80;padding:2px 8px;border-radius:10px;font-size:0.7rem;font-weight:600">Ready to publish</span></div>')
+          +'</div>'
+          +'<div style="display:flex;gap:6px;flex-shrink:0">'
+          +'<button onclick="editDraft('+e.id+')" style="padding:6px 12px;border-radius:6px;border:1px solid #334155;background:transparent;color:#94a3b8;font-size:0.75rem;cursor:pointer;font-family:inherit">✏️ Edit</button>'
+          +'<button onclick="publishDraft('+e.id+')" style="padding:6px 12px;border-radius:6px;border:none;background:#22c55e;color:white;font-size:0.75rem;cursor:pointer;font-weight:600;font-family:inherit">🚀 Publish</button>'
+          +'<button onclick="deleteDraft('+e.id+')" style="padding:6px 12px;border-radius:6px;border:1px solid #7f1d1d;background:transparent;color:#fca5a5;font-size:0.75rem;cursor:pointer;font-family:inherit">🗑️</button>'
+          +'</div></div></div>';
+      }).join('');
+      document.getElementById('draftList').innerHTML='<div style="margin-bottom:10px;color:#94a3b8;font-size:0.85rem">'+drafts.length+' draft event'+(drafts.length===1?'':'s')+'</div>'+html;
+    })
+    .catch(function(){document.getElementById('draftList').innerHTML='<div style="color:#f87171;padding:10px">Failed to load drafts</div>'});
+}
+
+function editDraft(id){
+  // Reuse the existing edit modal
+  var e=E.find(function(x){return x.id===id});
+  if(!e){
+    // Fetch from drafts
+    fetch('/admin/api/drafts',{headers:{Authorization:auth}})
+      .then(function(r){return r.json()})
+      .then(function(drafts){
+        var d=drafts.find(function(x){return x.id===id});
+        if(d){E.push(d);openEdit(id)}
+      });
+    return;
+  }
+  openEdit(id);
+}
+
+function publishDraft(id){
+  api('PUT','/admin/api/events/'+id,{status:'live'},function(){
+    toast('Event published! 🚀');
+    var e=E.find(function(x){return x.id===id});
+    if(e)e.status='live';
+    loadDrafts();
+  });
+}
+
+function deleteDraft(id){
+  if(!confirm('Delete this draft?'))return;
+  api('DELETE','/admin/api/events/'+id,{},function(){
+    E=E.filter(function(x){return x.id!==id});
+    us();
+    loadDrafts();
+    toast('Draft deleted');
+  });
+}
+// ========== END UPLOAD & DRAFTS ==========
 
 // ========== INSTAGRAM POST GENERATOR ==========
 var igSelectedEvent=null;
@@ -2456,6 +2658,93 @@ function igPreview(){igTemplateChange();}
 // ADMIN API ROUTES
 // =====================================================================
 
+// Parse Excel file
+app.post('/admin/api/parse-excel', upload.single('file'), async (req, res) => {
+  if (!authCheck(req, res)) return;
+  try {
+    const XLSX = require('xlsx');
+    const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+    
+    const events = rows.map(row => {
+      const get = (...keys) => {
+        for (const k of keys) {
+          for (const col of Object.keys(row)) {
+            if (col.toLowerCase().replace(/[^a-z]/g, '').includes(k.toLowerCase().replace(/[^a-z]/g, ''))) {
+              if (row[col]) return String(row[col]).trim();
+            }
+          }
+        }
+        return '';
+      };
+      
+      const title = get('eventname', 'name', 'title', 'event');
+      const date = get('eventdate', 'date');
+      const time = get('eventtime', 'time');
+      const location = get('eventlocation', 'location', 'venue');
+      const price = get('eventprice', 'price', 'cost');
+      const link = get('eventlink', 'link', 'url', 'website');
+      const contact = get('contact', 'phone', 'email');
+      
+      if (!title) return null;
+      
+      let desc = '';
+      if (price) desc += 'Price: ' + price;
+      if (time) desc += (desc ? ' · ' : '') + 'Time: ' + time;
+      if (contact) desc += (desc ? ' · ' : '') + 'Contact: ' + contact;
+      
+      return {
+        title, event_date: date, location, description: desc,
+        source_url: link || '', source_name: 'Community Events Malta'
+      };
+    }).filter(e => e !== null);
+    
+    res.json({ events, count: events.length });
+  } catch (e) {
+    console.error('Parse excel error:', e);
+    res.json({ error: e.message });
+  }
+});
+
+// Import events as drafts
+app.post('/admin/api/import-drafts', async (req, res) => {
+  if (!authCheck(req, res)) return;
+  try {
+    const events = req.body.events;
+    if (!events || !events.length) return res.json({ error: 'No events' });
+    
+    // Ensure status column exists
+    await pool.query("ALTER TABLE events ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'live'").catch(() => {});
+    
+    let count = 0;
+    for (const e of events) {
+      const slug = (e.title || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').substring(0, 80);
+      await pool.query(
+        `INSERT INTO events (title, event_date, location, description, source_url, source_name, slug, status, image_url, category)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'draft', '', '')`,
+        [e.title, e.event_date, e.location, e.description, e.source_url, e.source_name || 'Community Events Malta', slug]
+      );
+      count++;
+    }
+    res.json({ ok: true, count });
+  } catch (e) {
+    console.error('Import drafts error:', e);
+    res.json({ error: e.message });
+  }
+});
+
+// Get draft events
+app.get('/admin/api/drafts', async (req, res) => {
+  if (!authCheck(req, res)) return;
+  try {
+    const result = await pool.query("SELECT * FROM events WHERE status = 'draft' ORDER BY id DESC");
+    res.json(result.rows);
+  } catch (e) {
+    res.json([]);
+  }
+});
+
 // Image proxy for Instagram post generator (avoids CORS)
 app.get('/admin/api/proxy-image', async (req, res) => {
   if (!authCheck(req, res)) return;
@@ -2493,7 +2782,7 @@ app.get('/admin/api/events', async (req, res) => {
     // Try with category column first, fallback without it
     let result;
     try {
-      result = await pool.query('SELECT id, title, source_url, image_url, event_date, location, description, category, source_name, recurring FROM events ORDER BY title');
+      result = await pool.query("SELECT id, title, source_url, image_url, event_date, location, description, category, source_name, recurring, COALESCE(status,'live') as status FROM events ORDER BY title");
     } catch (e) {
       // columns might not exist yet
       try {
@@ -2554,16 +2843,24 @@ app.delete('/admin/api/events/:id', async (req, res) => {
 app.put('/admin/api/events/:id', async (req, res) => {
   if (!authCheck(req, res)) return;
   try {
-    const { title, event_date, location, source_name, category, description, recurring } = req.body;
+    const { title, event_date, location, source_name, category, description, recurring, status } = req.body;
     let { image_url, source_url } = req.body;
     // Auto-fix URLs missing protocol
     if (source_url && !source_url.startsWith('http') && !source_url.startsWith('manual:')) source_url = 'https://' + source_url;
     if (image_url && !image_url.startsWith('http')) image_url = 'https://' + image_url;
     await pool.query('ALTER TABLE events ADD COLUMN IF NOT EXISTS source_name TEXT').catch(()=>{});
     await pool.query('ALTER TABLE events ADD COLUMN IF NOT EXISTS recurring TEXT').catch(()=>{});
+    await pool.query("ALTER TABLE events ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'live'").catch(()=>{});
+    
+    // If only status is being updated (publish action)
+    if (status && !title) {
+      await pool.query('UPDATE events SET status=$1 WHERE id=$2', [status, req.params.id]);
+      return res.json({ success: true });
+    }
+    
     await pool.query(
-      `UPDATE events SET title=$1, event_date=$2, location=$3, source_name=$4, category=$5, image_url=$6, source_url=$7, description=$8, recurring=$9, slug=$10 WHERE id=$11`,
-      [title, event_date, location, source_name, category, image_url, source_url, description, recurring || null, generateSlug(title) + '-' + req.params.id, req.params.id]
+      `UPDATE events SET title=$1, event_date=$2, location=$3, source_name=$4, category=$5, image_url=$6, source_url=$7, description=$8, recurring=$9, slug=$10, status=COALESCE($12, status, 'live') WHERE id=$11`,
+      [title, event_date, location, source_name, category, image_url, source_url, description, recurring || null, generateSlug(title) + '-' + req.params.id, req.params.id, status || null]
     );
     // Also update overrides
     const evt = await pool.query('SELECT source_url FROM events WHERE id = $1', [req.params.id]);
