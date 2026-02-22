@@ -913,13 +913,13 @@ app.get('/event/:slug', async (req, res) => {
 
     .wrapper { max-width:960px; margin:30px auto; padding:0 20px 40px; }
 
-    .event-layout { display:grid; grid-template-columns:380px 1fr; gap:30px; background:white; border-radius:20px; overflow:hidden; box-shadow:0 4px 24px rgba(0,0,0,0.08); }
+    .event-layout { display:grid; grid-template-columns:400px 1fr; gap:0; background:white; border-radius:20px; overflow:hidden; box-shadow:0 4px 24px rgba(0,0,0,0.08); }
 
-    .event-img { position:relative; min-height:320px; background:#1e293b; overflow:hidden; }
-    .event-img img { width:100%; height:100%; object-fit:cover; position:absolute; top:0; left:0; }
-    .event-img .fallback { width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:white;font-size:6rem;font-weight:800;position:absolute;top:0;left:0; }
+    .event-img { position:relative; background:#1e293b; display:flex; align-items:center; justify-content:center; min-height:300px; }
+    .event-img img { width:100%; height:100%; object-fit:contain; background:#1e293b; }
+    .event-img .fallback { width:100%;height:100%;min-height:300px;display:flex;align-items:center;justify-content:center;color:white;font-size:6rem;font-weight:800; }
 
-    .event-details { padding:32px 32px 32px 0; display:flex; flex-direction:column; }
+    .event-details { padding:32px; display:flex; flex-direction:column; }
 
     .source-badge { display:inline-block; background:#f1f5f9; color:#64748b; padding:4px 12px; border-radius:20px; font-size:0.7rem; font-weight:600; text-transform:uppercase; margin-bottom:10px; width:fit-content; }
     h1 { font-size:1.8rem; font-weight:900; margin:0 0 16px; line-height:1.25; }
@@ -961,7 +961,8 @@ app.get('/event/:slug', async (req, res) => {
 
     @media (max-width:750px) {
       .event-layout { grid-template-columns:1fr; }
-      .event-img { min-height:240px; max-height:280px; }
+      .event-img { min-height:auto; max-height:450px; }
+      .event-img img { object-fit:contain; max-height:450px; }
       .event-details { padding:24px; }
       h1 { font-size:1.4rem; }
       .wrapper { margin-top:15px; }
