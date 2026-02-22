@@ -437,6 +437,14 @@ Object.entries(categoryPages).forEach(([slug, config]) => {
     ${Object.entries(categoryPages).filter(([s]) => s !== slug).map(([s, c]) => `<a href="/${s}">${c.h1.replace(' in Malta','')}</a>`).join(' ')}
     <a href="/">All Events</a>
   </div>
+  <footer style="margin-top:30px;padding:30px 20px;background:#1e293b;color:#94a3b8;text-align:center;font-size:0.8rem;line-height:1.8">
+    <a href="/" style="color:white;text-decoration:none;font-weight:700">Malta Event Guide</a> — Your complete guide to events in Malta & Gozo
+    <div style="margin-top:12px;display:flex;justify-content:center;gap:16px">
+      <a href="https://www.instagram.com/maltaeventguide/" target="_blank" rel="noopener" style="color:#94a3b8;transition:0.2s" onmouseover="this.style.color='#FF385C'" onmouseout="this.style.color='#94a3b8'" title="Instagram"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg></a>
+      <a href="https://youtube.com/@maltaeventsguide" target="_blank" rel="noopener" style="color:#94a3b8;transition:0.2s" onmouseover="this.style.color='#FF0000'" onmouseout="this.style.color='#94a3b8'" title="YouTube"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg></a>
+    </div>
+    <div style="margin-top:10px">&copy; ${new Date().getFullYear()} maltaeventguide.com · Powered by <a href="https://bugrayildirim.me/" target="_blank" style="color:#94a3b8">Bugra</a></div>
+  </footer>
 </body>
 </html>`);
     } catch(e) { res.redirect('/'); }
@@ -691,6 +699,15 @@ app.get('/', async (req, res) => {
 <body>
   <header>
     <div class="header-overlay"></div>
+    <div style="position:absolute;top:0;left:0;right:0;padding:18px 24px;display:flex;align-items:center;justify-content:space-between;z-index:3">
+      <a href="/" style="text-decoration:none">
+        <img src="/logo.png" alt="Malta Event Guide" style="height:50px">
+      </a>
+      <div style="display:flex;align-items:center;gap:12px">
+        <a href="https://www.instagram.com/maltaeventguide/" target="_blank" rel="noopener" style="color:rgba(255,255,255,0.7);display:flex;align-items:center;transition:0.2s" onmouseover="this.style.color='white'" onmouseout="this.style.color='rgba(255,255,255,0.7)'" title="Instagram"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg></a>
+        <a href="https://youtube.com/@maltaeventsguide" target="_blank" rel="noopener" style="color:rgba(255,255,255,0.7);display:flex;align-items:center;transition:0.2s" onmouseover="this.style.color='white'" onmouseout="this.style.color='rgba(255,255,255,0.7)'" title="YouTube"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg></a>
+      </div>
+    </div>
     <div class="header-content">
       <h1>Malta Events Guide</h1>
       <div class="subtitle">Discover ${upcoming.length + past.length} events across Malta & Gozo</div>
@@ -1231,7 +1248,11 @@ app.get('/event/:slug', async (req, res) => {
 
   <div class="footer">
     <a href="/">Malta Event Guide</a> — Your complete guide to events in Malta & Gozo<br>
-    &copy; ${new Date().getFullYear()} maltaeventguide.com · Powered by <a href="https://bugrayildirim.me/" target="_blank">Bugra</a> · <a href="mailto:hello@bugrayildirim.me">hello@bugrayildirim.me</a>
+    <div style="margin-top:12px;display:flex;justify-content:center;gap:16px">
+      <a href="https://www.instagram.com/maltaeventguide/" target="_blank" rel="noopener" style="color:#94a3b8;transition:0.2s" onmouseover="this.style.color='#FF385C'" onmouseout="this.style.color='#94a3b8'" title="Instagram"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg></a>
+      <a href="https://youtube.com/@maltaeventsguide" target="_blank" rel="noopener" style="color:#94a3b8;transition:0.2s" onmouseover="this.style.color='#FF0000'" onmouseout="this.style.color='#94a3b8'" title="YouTube"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg></a>
+    </div>
+    <div style="margin-top:10px">&copy; ${new Date().getFullYear()} maltaeventguide.com · Powered by <a href="https://bugrayildirim.me/" target="_blank">Bugra</a> · <a href="mailto:hello@bugrayildirim.me">hello@bugrayildirim.me</a></div>
   </div>
 
   <div id="cookieBanner" style="display:none;position:fixed;bottom:0;left:0;right:0;background:#0f172a;color:#e2e8f0;padding:16px 24px;z-index:9999;box-shadow:0 -4px 20px rgba(0,0,0,0.3)">
