@@ -2204,7 +2204,14 @@ function igGenSingle(){
       
       afterImage();
     };
-    img.onerror=function(){afterImage()};
+    img.onerror=function(){
+      // CORS failed - try proxy
+      if(img.src.indexOf('/admin/api/proxy-image')<0){
+        img.src='/admin/api/proxy-image?url='+encodeURIComponent(e.image_url);
+      } else {
+        afterImage();
+      }
+    };
     img.src=e.image_url;
   } else {
     // No image - draw placeholder
@@ -2385,6 +2392,26 @@ function igPreview(){igTemplateChange();}
 // =====================================================================
 // ADMIN API ROUTES
 // =====================================================================
+
+// Image proxy for Instagram post generator (avoids CORS)
+app.get('/admin/api/proxy-image', async (req, res) => {
+  if (!authCheck(req, res)) return;
+  const url = req.query.url;
+  if (!url) return res.status(400).send('Missing url');
+  try {
+    const fetch = (await import('node-fetch')).default;
+    const response = await fetch(url, { timeout: 10000, headers: { 'User-Agent': 'Mozilla/5.0' } });
+    if (!response.ok) return res.status(404).send('Image not found');
+    const contentType = response.headers.get('content-type') || 'image/jpeg';
+    const buffer = await response.buffer();
+    res.type(contentType).set({
+      'Cache-Control': 'public, max-age=3600',
+      'Access-Control-Allow-Origin': '*'
+    }).send(buffer);
+  } catch (e) {
+    res.status(500).send('Failed to fetch image');
+  }
+});
 
 // Get all events
 app.get('/admin/api/events', async (req, res) => {
