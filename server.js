@@ -768,7 +768,7 @@ app.get('/', async (req, res) => {
     </div>
     <div class="header-content">
       <h1>Malta Events Guide</h1>
-      <div class="subtitle">Discover ${upcoming.length + past.length} events across Malta & Gozo</div>
+      <div class="subtitle">Discover ${upcoming.length} events across Malta & Gozo</div>
     </div>
     <div class="search-box-wrapper">
       <div class="search-box">
@@ -805,7 +805,7 @@ app.get('/', async (req, res) => {
       <option value="past">Past Only</option>
     </select>
     <button class="reset-btn" onclick="resetFilters()">Reset Filters</button>
-    <span class="filter-count" id="filterCount">${upcoming.length} upcoming · ${past.length} past</span>
+    <span class="filter-count" id="filterCount">${upcoming.length} events</span>
   </div>
 
   ${(() => {
@@ -833,7 +833,6 @@ app.get('/', async (req, res) => {
 
   <div class="container" id="eventGrid">
     ${upcoming.map(e => createCard(e, false)).join('')}
-    ${past.length > 0 ? '<div class="separator event-item" data-source="" data-location="">Past Events Archive</div>' + past.map(e => createCard(e, true)).join('') : ''}
   </div>
 
   <script>
