@@ -1509,6 +1509,7 @@ app.get('/admin', (req, res) => {
     .login-box input { width: 100%; padding: 12px 16px; border-radius: 8px; border: 1px solid #334155; background: #0f172a; color: white; font-size: 1rem; margin-bottom: 15px; font-family: inherit; }
     .login-box button, .form-btn { width: 100%; padding: 12px; border-radius: 8px; border: none; background: #FF385C; color: white; font-size: 1rem; font-weight: 700; cursor: pointer; font-family: inherit; }
     .login-box button:hover, .form-btn:hover { background: #e11d48; }
+    .ig-pick-row:not(.ig-pick-done):hover { background: #334155; }
     .admin-panel { display: none; }
     .admin-header { background: #1e293b; padding: 20px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; position: sticky; top: 0; z-index: 100; }
     .admin-header h1 { font-size: 1.5rem; }
@@ -2848,7 +2849,7 @@ function igPickFilter(){
   var matches=E.filter(function(e){return e.title&&e.title.toLowerCase().indexOf(q)>=0}).slice(0,10);
   list.innerHTML=matches.map(function(e){
     var already=igPicks.some(function(p){return p.id===e.id});
-    return '<div onclick="igPickAdd('+e.id+')" style="padding:8px 12px;cursor:'+(already?'default':'pointer')+';border-bottom:1px solid #1a2332;display:flex;align-items:center;gap:8px;opacity:'+(already?'0.4':'1')+'" '+(already?'':'onmouseover="this.style.background=\'#334155\'" onmouseout="this.style.background=\'transparent\'"')+'>'
+    return '<div class="ig-pick-row'+(already?' ig-pick-done':'')+'" onclick="igPickAdd('+e.id+')" style="padding:8px 12px;cursor:'+(already?'default':'pointer')+';border-bottom:1px solid #1a2332;display:flex;align-items:center;gap:8px;opacity:'+(already?'0.4':'1')+'">'
       +'<div style="color:white;font-size:0.85rem;font-weight:600">'+esc(e.title)+'</div>'
       +'<div style="color:#64748b;font-size:0.7rem;margin-left:auto;white-space:nowrap">'+(e.event_date||'')+'</div>'
       +(already?'<span style="color:#4ade80;font-size:0.7rem">✓</span>':'')
