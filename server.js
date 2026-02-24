@@ -43,6 +43,7 @@ pool.query('ALTER TABLE events ADD COLUMN IF NOT EXISTS source_name TEXT').catch
 pool.query('ALTER TABLE events ADD COLUMN IF NOT EXISTS recurring TEXT').catch(()=>{});
 pool.query('ALTER TABLE events ADD COLUMN IF NOT EXISTS slug TEXT').catch(()=>{});
 pool.query("ALTER TABLE events ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'live'").catch(()=>{});
+pool.query("ALTER TABLE events ADD COLUMN IF NOT EXISTS featured BOOLEAN DEFAULT FALSE").catch(()=>{});
 
 pool.query(`CREATE TABLE IF NOT EXISTS email_subscribers (
   id SERIAL PRIMARY KEY,
@@ -81,8 +82,34 @@ function parseSingleDate(str) {
   if (!str) return null;
   str = str.trim();
   if (str.includes('€') || str.startsWith('Price')) return null;
+  
+  // Strip day names: "Saturday, 21 February 2026" -> "21 February 2026"
+  str = str.replace(/^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)[,\s]*/i, '');
+  // Strip time: "21-Feb-2026 at 20:30" -> "21-Feb-2026"
+  str = str.replace(/\s+at\s+\d{1,2}[:.]\d{2}.*/i, '');
+  // Strip ordinal suffixes: "21st" -> "21"
+  str = str.replace(/(\d+)(st|nd|rd|th)/gi, '$1');
+  // Normalize dashes: "21-Feb-2026" -> "21 Feb 2026"
+  str = str.replace(/(\d+)-([A-Za-z])/g, '$1 $2');
+  str = str.replace(/([A-Za-z])-(\d)/g, '$1 $2');
+  str = str.trim();
+  
+  // "21 February 2026" or "21 Feb 2026"
   let m = str.match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$/);
   if (m && monthToNum(m[2]) !== null) return new Date(+m[3], monthToNum(m[2]), +m[1]);
+  
+  // "February 21, 2026" or "Feb 21, 2026"
+  m = str.match(/^([A-Za-z]+)\s+(\d{1,2})[,\s]+(\d{4})$/);
+  if (m && monthToNum(m[1]) !== null) return new Date(+m[3], monthToNum(m[1]), +m[2]);
+  
+  // "Mar 19, 20, 21 2026"
+  m = str.match(/^([A-Za-z]+)\s+([\d,\s]+)\s+(\d{4})$/);
+  if (m && monthToNum(m[1]) !== null) {
+    const days = m[2].split(',').map(d=>+d.trim()).filter(d=>d);
+    return new Date(+m[3], monthToNum(m[1]), days[0]);
+  }
+  
+  // "21 Feb" (no year)
   m = str.match(/^(\d{1,2})\s+([A-Za-z]{3,})$/);
   if (m && monthToNum(m[2]) !== null) {
     const y = new Date().getFullYear();
@@ -90,6 +117,17 @@ function parseSingleDate(str) {
     if (d < Date.now() - 60*86400000) d.setFullYear(y+1);
     return d;
   }
+  
+  // "February 28" (month name + day, no year)
+  m = str.match(/^([A-Za-z]+)\s+(\d{1,2})$/);
+  if (m && monthToNum(m[1]) !== null) {
+    const y = new Date().getFullYear();
+    const d = new Date(y, monthToNum(m[1]), +m[2]);
+    if (d < Date.now() - 60*86400000) d.setFullYear(y+1);
+    return d;
+  }
+  
+  // Multi-day: "19,20,21 Mar"
   m = str.match(/^([\d,\s]+)\s+([A-Za-z]{3,})$/);
   if (m && monthToNum(m[2]) !== null) {
     const days = m[1].split(',').map(d=>+d.trim()).filter(d=>d);
@@ -98,6 +136,11 @@ function parseSingleDate(str) {
     if (d < Date.now() - 60*86400000) d.setFullYear(y+1);
     return d;
   }
+  
+  // DD/MM/YYYY
+  m = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (m) return new Date(+m[3], +m[2]-1, +m[1]);
+  
   return null;
 }
 
@@ -419,6 +462,7 @@ Object.entries(categoryPages).forEach(([slug, config]) => {
     <div style="display:flex;align-items:center;gap:12px;margin-left:auto">
       <a href="https://www.instagram.com/maltaeventguide/" target="_blank" rel="noopener" style="color:#94a3b8;display:flex;align-items:center;transition:0.2s" onmouseover="this.style.color='white'" onmouseout="this.style.color='#94a3b8'" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg></a>
       <a href="https://youtube.com/@maltaeventsguide" target="_blank" rel="noopener" style="color:#94a3b8;display:flex;align-items:center;transition:0.2s" onmouseover="this.style.color='white'" onmouseout="this.style.color='#94a3b8'" title="YouTube"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg></a>
+      <a href="https://www.tiktok.com/@malta.events.guid" target="_blank" rel="noopener" style="color:#94a3b8;display:flex;align-items:center;transition:0.2s" onmouseover="this.style.color='white'" onmouseout="this.style.color='#94a3b8'" title="TikTok"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1v-3.5a6.37 6.37 0 00-.79-.05A6.34 6.34 0 003.15 15.2a6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.34-6.34V8.73a8.19 8.19 0 004.76 1.52V6.79a4.84 4.84 0 01-1-.1z"/></svg></a>
       <a href="/" class="back">← All Events</a>
     </div>
   </div>
@@ -450,6 +494,7 @@ Object.entries(categoryPages).forEach(([slug, config]) => {
     <div style="margin-top:12px;display:flex;justify-content:center;gap:16px">
       <a href="https://www.instagram.com/maltaeventguide/" target="_blank" rel="noopener" style="color:#94a3b8;transition:0.2s" onmouseover="this.style.color='#FF385C'" onmouseout="this.style.color='#94a3b8'" title="Instagram"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg></a>
       <a href="https://youtube.com/@maltaeventsguide" target="_blank" rel="noopener" style="color:#94a3b8;transition:0.2s" onmouseover="this.style.color='#FF0000'" onmouseout="this.style.color='#94a3b8'" title="YouTube"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg></a>
+      <a href="https://www.tiktok.com/@malta.events.guid" target="_blank" rel="noopener" style="color:#94a3b8;transition:0.2s" onmouseover="this.style.color='#00f2ea'" onmouseout="this.style.color='#94a3b8'" title="TikTok"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1v-3.5a6.37 6.37 0 00-.79-.05A6.34 6.34 0 003.15 15.2a6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.34-6.34V8.73a8.19 8.19 0 004.76 1.52V6.79a4.84 4.84 0 01-1-.1z"/></svg></a>
     </div>
     <div style="margin-top:10px">&copy; ${new Date().getFullYear()} maltaeventguide.com · Powered by <a href="https://bugrayildirim.me/" target="_blank" style="color:#94a3b8">Bugra</a></div>
   </footer>
@@ -714,6 +759,7 @@ app.get('/', async (req, res) => {
       <div style="display:flex;align-items:center;gap:12px">
         <a href="https://www.instagram.com/maltaeventguide/" target="_blank" rel="noopener" style="color:rgba(255,255,255,0.7);display:flex;align-items:center;transition:0.2s" onmouseover="this.style.color='white'" onmouseout="this.style.color='rgba(255,255,255,0.7)'" title="Instagram"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg></a>
         <a href="https://youtube.com/@maltaeventsguide" target="_blank" rel="noopener" style="color:rgba(255,255,255,0.7);display:flex;align-items:center;transition:0.2s" onmouseover="this.style.color='white'" onmouseout="this.style.color='rgba(255,255,255,0.7)'" title="YouTube"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg></a>
+        <a href="https://www.tiktok.com/@malta.events.guid" target="_blank" rel="noopener" style="color:rgba(255,255,255,0.7);display:flex;align-items:center;transition:0.2s" onmouseover="this.style.color='white'" onmouseout="this.style.color='rgba(255,255,255,0.7)'" title="TikTok"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1v-3.5a6.37 6.37 0 00-.79-.05A6.34 6.34 0 003.15 15.2a6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.34-6.34V8.73a8.19 8.19 0 004.76 1.52V6.79a4.84 4.84 0 01-1-.1z"/></svg></a>
       </div>
     </div>
     <div class="header-content">
@@ -732,6 +778,7 @@ app.get('/', async (req, res) => {
     <button class="qf-btn" onclick="quickFilter('today',this)">🔥 Today</button>
     <button class="qf-btn" onclick="quickFilter('tomorrow',this)">📅 Tomorrow</button>
     <button class="qf-btn" onclick="quickFilter('weekend',this)">🎉 This Weekend</button>
+    <button class="qf-btn" onclick="quickFilter('week',this)">📆 This Week</button>
     <button class="qf-btn" onclick="quickFilter('week',this)">📆 This Week</button>
     <button class="qf-btn" onclick="quickFilter('all',this)">All</button>
   </div>
@@ -756,6 +803,29 @@ app.get('/', async (req, res) => {
     <button class="reset-btn" onclick="resetFilters()">Reset Filters</button>
     <span class="filter-count" id="filterCount">${upcoming.length} upcoming · ${past.length} past</span>
   </div>
+
+  ${(() => {
+    const featured = allEvents.filter(e => e.featured);
+    if (featured.length === 0) return '';
+    return `
+    <div style="max-width:1400px;margin:0 auto;padding:0 20px 20px">
+      <h2 style="font-size:1.3rem;font-weight:800;margin:0 0 15px;color:#1e293b">⭐ Featured Events</h2>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px">
+        ${featured.map(e => {
+          const slug = e.slug || generateSlug(e.title);
+          const img = e.image_url && e.image_url.startsWith('http') ? e.image_url : '';
+          return `<a href="/event/${slug}" style="text-decoration:none;display:block;background:white;border-radius:16px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);border:2px solid #fbbf24;transition:0.2s" onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 8px 25px rgba(0,0,0,0.12)'" onmouseout="this.style.transform='';this.style.boxShadow='0 2px 12px rgba(0,0,0,0.08)'">
+            ${img ? `<div style="height:180px;overflow:hidden"><img src="${img}" alt="${(e.title||'').replace(/"/g,'&quot;')}" style="width:100%;height:100%;object-fit:cover"></div>` : ''}
+            <div style="padding:14px">
+              <div style="font-size:0.7rem;font-weight:700;color:#f59e0b;text-transform:uppercase;margin-bottom:4px">⭐ Featured</div>
+              <div style="font-size:1rem;font-weight:700;color:#0f172a">${e.title}</div>
+              <div style="font-size:0.8rem;color:#64748b;margin-top:4px">${e.event_date || ''} · ${e.location || 'Malta'}</div>
+            </div>
+          </a>`;
+        }).join('')}
+      </div>
+    </div>`;
+  })()}
 
   <div class="container" id="eventGrid">
     ${upcoming.map(e => createCard(e, false)).join('')}
@@ -883,12 +953,9 @@ app.get('/', async (req, res) => {
         }
         
         if(mode==='today'){
-          // Single-day: exact match. Range: only if has recurring tag matching today
-          match = exactMatch(todayStr) || recurMatch(today);
-          if(!match && isRange && recur && inRange(todayStr)) match = recurMatch(today);
+          match = inRange(todayStr) || recurMatch(today);
         } else if(mode==='tomorrow'){
-          match = exactMatch(tomorrowStr) || recurMatch(tomorrow);
-          if(!match && isRange && recur && inRange(tomorrowStr)) match = recurMatch(tomorrow);
+          match = inRange(tomorrowStr) || recurMatch(tomorrow);
         } else if(mode==='weekend'){
           // Weekend: show range events too (likely happening at some point)
           for(var w=0;w<weekendDates.length;w++){
@@ -959,6 +1026,7 @@ app.get('/', async (req, res) => {
       <div style="margin-top:18px;display:flex;justify-content:center;gap:16px">
         <a href="https://www.instagram.com/maltaeventguide/" target="_blank" rel="noopener" style="color:#94a3b8;transition:0.2s" onmouseover="this.style.color='#FF385C'" onmouseout="this.style.color='#94a3b8'" title="Instagram"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg></a>
         <a href="https://youtube.com/@maltaeventsguide" target="_blank" rel="noopener" style="color:#94a3b8;transition:0.2s" onmouseover="this.style.color='#FF0000'" onmouseout="this.style.color='#94a3b8'" title="YouTube"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg></a>
+        <a href="https://www.tiktok.com/@malta.events.guid" target="_blank" rel="noopener" style="color:#94a3b8;transition:0.2s" onmouseover="this.style.color='#00f2ea'" onmouseout="this.style.color='#94a3b8'" title="TikTok"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1v-3.5a6.37 6.37 0 00-.79-.05A6.34 6.34 0 003.15 15.2a6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.34-6.34V8.73a8.19 8.19 0 004.76 1.52V6.79a4.84 4.84 0 01-1-.1z"/></svg></a>
       </div>
       <p style="margin-top:15px;font-size:0.75rem;color:#64748b">Powered by <a href="https://bugrayildirim.me/" target="_blank" style="color:#94a3b8;text-decoration:underline">Bugra</a> &middot; <a href="mailto:hello@bugrayildirim.me" style="color:#94a3b8;text-decoration:underline">hello@bugrayildirim.me</a></p>
     </div>
@@ -971,7 +1039,7 @@ app.get('/', async (req, res) => {
     "url": "https://maltaeventguide.com",
     "description": "Your complete guide to events in Malta and Gozo",
     "logo": "https://maltaeventguide.com/logo.png",
-    "sameAs": ["https://www.instagram.com/maltaeventguide/", "https://youtube.com/@maltaeventsguide"],
+    "sameAs": ["https://www.instagram.com/maltaeventguide/", "https://youtube.com/@maltaeventsguide", "https://www.tiktok.com/@malta.events.guid"],
     "areaServed": {
       "@type": "Country",
       "name": "Malta"
@@ -1203,6 +1271,7 @@ app.get('/event/:slug', async (req, res) => {
     <div style="display:flex;align-items:center;gap:12px;margin-left:auto">
       <a href="https://www.instagram.com/maltaeventguide/" target="_blank" rel="noopener" style="color:#94a3b8;display:flex;align-items:center" title="Instagram"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg></a>
       <a href="https://youtube.com/@maltaeventsguide" target="_blank" rel="noopener" style="color:#94a3b8;display:flex;align-items:center" title="YouTube"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg></a>
+      <a href="https://www.tiktok.com/@malta.events.guid" target="_blank" rel="noopener" style="color:#94a3b8;display:flex;align-items:center" title="TikTok"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1v-3.5a6.37 6.37 0 00-.79-.05A6.34 6.34 0 003.15 15.2a6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.34-6.34V8.73a8.19 8.19 0 004.76 1.52V6.79a4.84 4.84 0 01-1-.1z"/></svg></a>
       <a href="/" class="back">← All Events</a>
     </div>
   </nav>
@@ -1284,6 +1353,7 @@ app.get('/event/:slug', async (req, res) => {
     <div style="margin-top:12px;display:flex;justify-content:center;gap:16px">
       <a href="https://www.instagram.com/maltaeventguide/" target="_blank" rel="noopener" style="color:#94a3b8;transition:0.2s" onmouseover="this.style.color='#FF385C'" onmouseout="this.style.color='#94a3b8'" title="Instagram"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg></a>
       <a href="https://youtube.com/@maltaeventsguide" target="_blank" rel="noopener" style="color:#94a3b8;transition:0.2s" onmouseover="this.style.color='#FF0000'" onmouseout="this.style.color='#94a3b8'" title="YouTube"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg></a>
+      <a href="https://www.tiktok.com/@malta.events.guid" target="_blank" rel="noopener" style="color:#94a3b8;transition:0.2s" onmouseover="this.style.color='#00f2ea'" onmouseout="this.style.color='#94a3b8'" title="TikTok"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1v-3.5a6.37 6.37 0 00-.79-.05A6.34 6.34 0 003.15 15.2a6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.34-6.34V8.73a8.19 8.19 0 004.76 1.52V6.79a4.84 4.84 0 01-1-.1z"/></svg></a>
     </div>
     <div style="margin-top:10px">&copy; ${new Date().getFullYear()} maltaeventguide.com · Powered by <a href="https://bugrayildirim.me/" target="_blank">Bugra</a> · <a href="mailto:hello@bugrayildirim.me">hello@bugrayildirim.me</a></div>
   </div>
@@ -1534,6 +1604,7 @@ app.get('/admin', (req, res) => {
         </select>
         <button class="fb" onclick="selectAll4()" id="selBtn4">Select All</button>
         <button class="fb" onclick="bulkDel()" style="background:#7f1d1d;color:#fca5a5">🗑️ Delete Selected</button>
+        <button class="fb" onclick="removeDuplicates()" style="background:#1e3a5f;color:#60a5fa">🧹 Remove Duplicates</button>
       </div>
       <div class="cb" id="cb4">Loading...</div>
       <div class="events-grid" id="eg4"></div>
@@ -1552,6 +1623,7 @@ app.get('/admin', (req, res) => {
           <div class="form-group"><label>Image URL</label><input type="text" id="ed_img"></div>
           <div class="form-group"><label>Event URL</label><input type="text" id="ed_url"></div>
           <div class="form-group"><label>Description</label><textarea id="ed_desc" rows="3"></textarea></div>
+          <div class="form-group"><label style="display:flex;align-items:center;gap:10px;cursor:pointer"><input type="checkbox" id="ed_featured" style="width:18px;height:18px;accent-color:#f59e0b"> ⭐ Featured Event (shown at top of homepage)</label></div>
           <div style="display:flex;gap:10px;margin-top:15px">
             <button onclick="saveEdit()" style="flex:1;padding:12px;background:#22c55e;color:white;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-family:inherit">Save Changes</button>
             <button onclick="closeEdit()" style="flex:1;padding:12px;background:#334155;color:white;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-family:inherit">Cancel</button>
@@ -1950,7 +2022,7 @@ function af4(){
   var s=document.getElementById('ss4').value;
   var f=E.filter(function(e){
     if(q&&e.title.toLowerCase().indexOf(q)<0)return 0;
-    if(s!=='all'&&getSource(e)!==s&&(e.source_name||'').toLowerCase()!==s.toLowerCase())return 0;
+    if(s!=='all'&&getSrc(e).toLowerCase()!==s)return 0;
     return 1;
   });
   document.getElementById('cb4').innerHTML='Showing <span>'+f.length+'<\/span> of '+E.length+' events';
@@ -1964,7 +2036,7 @@ function buildSourceFilter4(){
   var cur=ss.value;
   var srcs={};
   E.forEach(function(e){
-    var s=e.source_name||getSrc(e);
+    var s=getSrc(e);
     var k=s.toLowerCase();
     if(!srcs[k])srcs[k]={name:s,count:0};
     srcs[k].count++;
@@ -1977,19 +2049,10 @@ function buildSourceFilter4(){
   ss.value=cur;
 }
 function buildSourceStats(){
-  var srcs={};
-  var canonical={};
-  E.forEach(function(e){
-    var s=(e.source_name||getSrc(e)).trim().replace(/\s+/g,' ');
-    var key=s.toLowerCase();
-    if(!canonical[key])canonical[key]=s;
-    s=canonical[key];
-    if(!srcs[s])srcs[s]=0;
-    srcs[s]++;
-  });
+  var stats=getSourceStats();
   var html='';
-  Object.keys(srcs).sort().forEach(function(s){
-    html+='<div style="background:#0f172a;border:1px solid #334155;border-radius:10px;padding:12px 18px;text-align:center;min-width:120px"><div style="font-size:1.5rem;font-weight:800;color:white">'+srcs[s]+'<\/div><div style="font-size:0.75rem;color:#94a3b8;margin-top:2px">'+s+'<\/div><\/div>';
+  Object.keys(stats).sort().forEach(function(s){
+    html+='<div style="background:#0f172a;border:1px solid #334155;border-radius:10px;padding:12px 18px;text-align:center;min-width:120px"><div style="font-size:1.5rem;font-weight:800;color:white">'+stats[s]+'<\/div><div style="font-size:0.75rem;color:#94a3b8;margin-top:2px">'+s+'<\/div><\/div>';
   });
   html+='<div style="background:#0f172a;border:1px solid #22c55e;border-radius:10px;padding:12px 18px;text-align:center;min-width:120px"><div style="font-size:1.5rem;font-weight:800;color:#22c55e">'+E.length+'<\/div><div style="font-size:0.75rem;color:#94a3b8;margin-top:2px">Total<\/div><\/div>';
   document.getElementById('sourceStats').innerHTML=html;
@@ -2064,6 +2127,7 @@ function openEdit(id){
   document.getElementById('ed_url').value=e.source_url||'';
   document.getElementById('ed_desc').value=e.description||'';
   document.getElementById('ed_recur').value=e.recurring||'';
+  document.getElementById('ed_featured').checked=!!e.featured;
   document.getElementById('editModal').style.display='block';
 }
 function closeEdit(){document.getElementById('editModal').style.display='none'}
@@ -2082,7 +2146,8 @@ function saveEdit(){
     image_url:imgVal,
     source_url:urlVal,
     description:document.getElementById('ed_desc').value.trim()||null,
-    recurring:document.getElementById('ed_recur').value||null
+    recurring:document.getElementById('ed_recur').value||null,
+    featured:document.getElementById('ed_featured').checked
   };
   if(!data.title)return toast('Title required',1);
   api('PUT','/admin/api/events/'+id,data,function(){
@@ -2104,9 +2169,37 @@ function getSource(e){
   if(!e.source_url)return 'manual';
   if(e.source_url.indexOf('showshappening')>-1)return 'showshappening';
   if(e.source_url.indexOf('visitmalta')>-1)return 'visitmalta';
+  if(e.source_url.indexOf('ra.co')>-1||e.source_url.indexOf('residentadvisor')>-1)return 'residentadvisor';
+  if(e.source_url.indexOf('eventworks')>-1)return 'eventworks';
+  if(e.source_url.indexOf('biljett')>-1)return 'biljett';
   return 'manual';
 }
-function getSrc(e){if(e.source_name)return e.source_name;var s=getSource(e);return s==='showshappening'?'ShowsHappening':s==='visitmalta'?'VisitMalta':'Other'}
+function getSrc(e){
+  // Consolidate sources for clean display
+  var s=getSource(e);
+  if(s==='showshappening')return 'ShowsHappening';
+  if(s==='visitmalta')return 'VisitMalta';
+  if(s==='residentadvisor')return 'Resident Advisor';
+  if(s==='eventworks')return 'EventWorks';
+  if(s==='biljett')return 'Biljett.mt';
+  if(e.source_name){
+    // Consolidate "ShowsHappening · xyz" to just "ShowsHappening"
+    if(e.source_name.indexOf('ShowsHappening')>-1||e.source_name.indexOf('Show Happening')>-1)return 'ShowsHappening';
+    if(e.source_name.indexOf('Community Events')>-1)return 'Community Events Malta';
+    if(e.source_name.indexOf('Dark Malta')>-1)return 'Dark Malta Festival';
+    return e.source_name;
+  }
+  return 'Other';
+}
+// Source stats: group by consolidated source
+function getSourceStats(){
+  var counts={};
+  E.forEach(function(e){
+    var src=getSrc(e);
+    counts[src]=(counts[src]||0)+1;
+  });
+  return counts;
+}
 function ue(id,f,v){var e=E.find(function(x){return x.id===id});if(e)e[f]=v;us();if(tab==='images')af1();else if(tab==='dates')af2();else if(tab==='categories')af3();else if(tab==='manage')af4()}
 function api(method,url,body,cb){
   fetch(url,{method:method,headers:{'Content-Type':'application/json',Authorization:auth},body:JSON.stringify(body)})
@@ -2114,6 +2207,20 @@ function api(method,url,body,cb){
 }
 function toast(m,e){var t=document.getElementById('toast');t.textContent=m;t.className='toast show'+(e?' err':'');setTimeout(function(){t.className='toast'},3000)}
 
+function removeDuplicates(){
+  if(!confirm('This will automatically remove duplicate events, keeping the version with the most data (image, description, category). Continue?'))return;
+  fetch('/admin/api/remove-duplicates',{method:'POST',headers:{Authorization:auth}})
+    .then(function(r){return r.json()})
+    .then(function(d){
+      if(d.ok){
+        toast(d.removed+' duplicates removed!');
+        // Reload events
+        fetch('/admin/api/events',{headers:{Authorization:auth}}).then(function(r){return r.json()}).then(function(dd){E=dd;us();af4()});
+      } else {
+        toast('Error: '+(d.error||'unknown'),1);
+      }
+    }).catch(function(){toast('Failed',1)});
+}
 // ========== EXCEL UPLOAD & DRAFTS ==========
 var xlParsedEvents=[];
 
@@ -2624,7 +2731,7 @@ function igGenMulti(type){
   selected.forEach(function(e,i){
     cap+=(i+1)+'. '+e.title+(e.event_date?' — '+e.event_date:'')+'\\n';
   });
-  cap+='\\n👉 Full listings at maltaeventguide.com\\n\\n#MaltaEvents #WhatsOnMalta #MaltaNightlife #MaltaFestivals #ThingsToDoInMalta #VisitMalta #MaltaLife #ExploreMalta #Malta2026';
+  cap+='\\n👉 Full listings at maltaeventguide.com\\n\\n#MaltaEvents #WhatsOnMalta #MaltaNightlife #MaltaFestivals #ThingsToDoInMalta #VisitMalta #MaltaLife #ExploreMalta #Malta2026 #MaltaIsland #Valletta #Malta #LifeInMalta #MaltaExperience #MediterraneanLife #IslandLife';
   document.getElementById('igCaption').value=cap;
 }
 
@@ -2637,7 +2744,7 @@ function igSetCaption(e){
     var d=e.description.length>200?e.description.substring(0,200)+'...':e.description;
     cap+='\\n'+d+'\\n';
   }
-  cap+='\\n👉 Link in bio for full details & more events!\\n\\n#MaltaEvents #WhatsOnMalta #ThingsToDoInMalta #VisitMalta #MaltaLife #ExploreMalta';
+  cap+='\\n👉 Link in bio for full details & more events!\\n\\n#MaltaEvents #WhatsOnMalta #ThingsToDoInMalta #VisitMalta #MaltaLife #ExploreMalta #Malta2026 #MaltaIsland #Valletta #Malta #LifeInMalta #MaltaExperience #MediterraneanLife #IslandLife #MaltaEntertainment #WeekendMalta';
   if(e.category){
     if(e.category.indexOf('Music')>=0||e.category.indexOf('Concert')>=0) cap+=' #LiveMusicMalta #MaltaConcerts';
     if(e.category.indexOf('Nightlife')>=0) cap+=' #MaltaNightlife #Paceville';
@@ -2777,6 +2884,67 @@ app.get('/admin/api/drafts', async (req, res) => {
   }
 });
 
+// Remove duplicate events - keeps the one with most data
+app.post('/admin/api/remove-duplicates', async (req, res) => {
+  if (!authCheck(req, res)) return;
+  try {
+    const result = await pool.query('SELECT * FROM events ORDER BY id');
+    const events = result.rows;
+    
+    // Group by normalized title
+    const groups = {};
+    events.forEach(e => {
+      const key = (e.title || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (key.length < 5) return;
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(e);
+    });
+    
+    let removed = 0;
+    const toDelete = [];
+    
+    for (const key of Object.keys(groups)) {
+      if (groups[key].length <= 1) continue;
+      
+      const dupes = groups[key];
+      // Score each duplicate - higher = more data = keep this one
+      dupes.forEach(e => {
+        e._score = 0;
+        if (e.image_url && e.image_url.startsWith('http')) e._score += 10;
+        if (e.description && e.description.length > 20) e._score += 5;
+        if (e.description && e.description.length > 100) e._score += 5;
+        if (e.category) e._score += 3;
+        if (e.event_date) e._score += 3;
+        if (e.location && e.location !== 'Malta') e._score += 2;
+        if (e.recurring) e._score += 1;
+        // Prefer certain sources
+        const src = (e.source_url || '').toLowerCase();
+        if (src.includes('showshappening')) e._score += 1;
+        if (src.includes('visitmalta')) e._score += 1;
+        if (src.includes('ra.co')) e._score += 2;
+      });
+      
+      // Sort by score descending - keep the best one
+      dupes.sort((a, b) => b._score - a._score);
+      
+      // Keep first (best), delete the rest
+      for (let i = 1; i < dupes.length; i++) {
+        toDelete.push(dupes[i].id);
+      }
+    }
+    
+    if (toDelete.length > 0) {
+      await pool.query('DELETE FROM events WHERE id = ANY($1)', [toDelete]);
+      removed = toDelete.length;
+    }
+    
+    res.json({ ok: true, removed, checked: events.length });
+  } catch (e) {
+    console.error('Remove duplicates error:', e);
+    res.json({ error: e.message });
+  }
+});
+
 // Image proxy for Instagram post generator (avoids CORS)
 app.get('/admin/api/proxy-image', async (req, res) => {
   if (!authCheck(req, res)) return;
@@ -2814,7 +2982,7 @@ app.get('/admin/api/events', async (req, res) => {
     // Try with category column first, fallback without it
     let result;
     try {
-      result = await pool.query("SELECT id, title, source_url, image_url, event_date, location, description, category, source_name, recurring, COALESCE(status,'live') as status FROM events ORDER BY title");
+      result = await pool.query("SELECT id, title, source_url, image_url, event_date, location, description, category, source_name, recurring, COALESCE(status,'live') as status, COALESCE(featured,FALSE) as featured FROM events ORDER BY title");
     } catch (e) {
       // columns might not exist yet
       try {
@@ -2875,7 +3043,7 @@ app.delete('/admin/api/events/:id', async (req, res) => {
 app.put('/admin/api/events/:id', async (req, res) => {
   if (!authCheck(req, res)) return;
   try {
-    const { title, event_date, location, source_name, category, description, recurring, status } = req.body;
+    const { title, event_date, location, source_name, category, description, recurring, status, featured } = req.body;
     let { image_url, source_url } = req.body;
     // Auto-fix URLs missing protocol
     if (source_url && !source_url.startsWith('http') && !source_url.startsWith('manual:')) source_url = 'https://' + source_url;
@@ -2883,6 +3051,7 @@ app.put('/admin/api/events/:id', async (req, res) => {
     await pool.query('ALTER TABLE events ADD COLUMN IF NOT EXISTS source_name TEXT').catch(()=>{});
     await pool.query('ALTER TABLE events ADD COLUMN IF NOT EXISTS recurring TEXT').catch(()=>{});
     await pool.query("ALTER TABLE events ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'live'").catch(()=>{});
+    await pool.query("ALTER TABLE events ADD COLUMN IF NOT EXISTS featured BOOLEAN DEFAULT FALSE").catch(()=>{});
     
     // If only status is being updated (publish action)
     if (status && !title) {
@@ -2891,8 +3060,8 @@ app.put('/admin/api/events/:id', async (req, res) => {
     }
     
     await pool.query(
-      `UPDATE events SET title=$1, event_date=$2, location=$3, source_name=$4, category=$5, image_url=$6, source_url=$7, description=$8, recurring=$9, slug=$10, status=COALESCE($12, status, 'live') WHERE id=$11`,
-      [title, event_date, location, source_name, category, image_url, source_url, description, recurring || null, generateSlug(title) + '-' + req.params.id, req.params.id, status || null]
+      `UPDATE events SET title=$1, event_date=$2, location=$3, source_name=$4, category=$5, image_url=$6, source_url=$7, description=$8, recurring=$9, slug=$10, status=COALESCE($12, status, 'live'), featured=COALESCE($13, featured, FALSE) WHERE id=$11`,
+      [title, event_date, location, source_name, category, image_url, source_url, description, recurring || null, generateSlug(title) + '-' + req.params.id, req.params.id, status || null, featured !== undefined ? featured : null]
     );
     // Also update overrides
     const evt = await pool.query('SELECT source_url FROM events WHERE id = $1', [req.params.id]);
