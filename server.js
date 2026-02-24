@@ -1056,16 +1056,40 @@ app.get('/event/:slug', async (req, res) => {
       "@type": "Event",
       "name": title,
       "description": event.description || desc,
+      "eventStatus": "https://schema.org/EventScheduled",
+      "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
       "location": {
         "@type": "Place",
         "name": loc,
         "address": { "@type": "PostalAddress", "addressCountry": "MT", "addressLocality": loc }
+      },
+      "organizer": {
+        "@type": "Organization",
+        "name": event.source_name || "Malta Event Guide",
+        "url": "https://maltaeventguide.com"
       }
     };
-    if (startDate) jsonLd.startDate = startDate.toISOString().split('T')[0];
+    if (startDate) {
+      jsonLd.startDate = startDate.toISOString().split('T')[0];
+      // endDate: use end of date range if available, otherwise same as start
+      const endDate = getEndDate(event.event_date);
+      jsonLd.endDate = endDate ? endDate.toISOString().split('T')[0] : jsonLd.startDate;
+    }
     if (hasImg) jsonLd.image = img;
-    if (externalUrl) jsonLd.url = externalUrl;
-    if (event.category) jsonLd.eventAttendanceMode = "https://schema.org/OfflineEventAttendanceMode";
+    if (externalUrl) {
+      jsonLd.url = externalUrl;
+      jsonLd.offers = {
+        "@type": "Offer",
+        "url": externalUrl,
+        "availability": "https://schema.org/InStock"
+      };
+    }
+    if (event.source_name) {
+      jsonLd.performer = {
+        "@type": "PerformingGroup",
+        "name": event.source_name
+      };
+    }
 
     const firstLetter = title.charAt(0).toUpperCase();
     const colors = [

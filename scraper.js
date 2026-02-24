@@ -14,13 +14,14 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-// --- 1. SHOWSHAPPENING ---
+// --- 1. SHOWSHAPPENING (DEEP SCRAPE - visits each event page) ---
 async function scrapeShowsHappening(browser) {
   const page = await browser.newPage();
   try {
-    console.log("ShowsHappening scraping...");
+    console.log("ShowsHappening scraping (deep mode)...");
     await page.goto('https://www.showshappening.com/', { waitUntil: 'networkidle', timeout: 60000 });
     
+    // Scroll to load all events
     await page.evaluate(async () => {
       await new Promise(resolve => {
         let totalHeight = 0;
@@ -34,10 +35,10 @@ async function scrapeShowsHappening(browser) {
       });
     });
 
-    const events = await page.evaluate(() => {
+    // Step 1: Collect all event URLs and basic info from homepage
+    const eventLinks = await page.evaluate(() => {
       const anchors = Array.from(document.querySelectorAll('a'));
       return anchors.map(a => {
-        // Split text into lines using actual newlines
         const rawText = a.innerText || '';
         const lines = rawText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
         
@@ -47,68 +48,39 @@ async function scrapeShowsHappening(browser) {
         
         const datePattern = /^(\d{1,2}[\s,]+)?(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i;
         const dateRangePattern = /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+to\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i;
-        // NEW: handle "14-Feb to 28-Mar" style dates
         const dashDateRange = /^\d{1,2}[- ](Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+to\s+\d{1,2}[- ](Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i;
         
         for (const line of lines) {
           if (line.toLowerCase() === 'follow') continue;
-          
-          // Detect price
-          if (line.includes('€') || line.toLowerCase() === 'free') {
-            price = line;
-            continue;
-          }
-          
-          // Detect date
-          if (datePattern.test(line) || dateRangePattern.test(line) || dashDateRange.test(line)) {
-            date = line;
-            continue;
-          }
-          
-          // Everything else is a potential title
-          if (!title && line.length > 3 && line.length < 200) {
-            title = line;
-          }
+          if (line.includes('€') || line.toLowerCase() === 'free') { price = line; continue; }
+          if (datePattern.test(line) || dateRangePattern.test(line) || dashDateRange.test(line)) { date = line; continue; }
+          if (!title && line.length > 3 && line.length < 200) title = line;
         }
         
-        // FALLBACK: If no title found from text, extract from URL slug
-        // e.g. "/ad-events-ltd/Carmen-by-Balletto-di-Milano" → "Carmen by Balletto di Milano"
         if (!title && a.href) {
           const urlParts = a.href.split('/');
           const slug = urlParts[urlParts.length - 1] || urlParts[urlParts.length - 2] || '';
           if (slug && slug.length > 3 && !slug.includes('?') && !slug.includes('category')) {
-            title = decodeURIComponent(slug)
-              .replace(/[-_]+/g, ' ')
-              .replace(/\b\w/g, c => c.toUpperCase())
-              .trim();
+            title = decodeURIComponent(slug).replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).trim();
           }
         }
         
         return {
-          title: title,
+          title,
           url: a.href,
           image_url: a.querySelector('img') ? a.querySelector('img').src : null,
-          date: date,
-          price: price,
+          date,
+          price,
         };
       }).filter(item => 
-        item.image_url && 
-        item.title &&
-        item.title.length > 3 && 
-        item.title.length < 200 &&
+        item.image_url && item.title && item.title.length > 3 && item.title.length < 200 &&
         !item.title.toLowerCase().includes('seller test') &&
         !item.title.toLowerCase().startsWith('entertainment') &&
         !item.title.toLowerCase().startsWith('showshappening') &&
-        // Filter out non-event links
-        !item.url.includes('apple.com') &&
-        !item.url.includes('apps.apple') &&
-        !item.url.includes('play.google') &&
-        !item.url.includes('Account/Login') &&
-        !item.url.includes('showsmanager.com') &&
-        !item.url.includes('/search?') &&
-        !item.url.includes('/whatshappening') &&
-        !item.url.endsWith('showshappening.com/') &&
-        // Must be an event page URL (contains organizer/event-slug pattern)
+        !item.url.includes('apple.com') && !item.url.includes('apps.apple') &&
+        !item.url.includes('play.google') && !item.url.includes('Account/Login') &&
+        !item.url.includes('showsmanager.com') && !item.url.includes('/search?') &&
+        !item.url.includes('/whatshappening') && !item.url.endsWith('showshappening.com/') &&
         item.url.includes('showshappening.com/') &&
         item.url.split('showshappening.com/')[1]?.includes('/')
       );
@@ -116,51 +88,213 @@ async function scrapeShowsHappening(browser) {
 
     // Deduplicate by URL
     const seen = new Set();
-    const unique = events.filter(e => {
+    const unique = eventLinks.filter(e => {
       if (seen.has(e.url)) return false;
       seen.add(e.url);
       return true;
     });
 
+    console.log(`  Found ${unique.length} unique events on homepage. Now visiting each page for details...`);
+
+    // Step 2: Visit each event page for rich details
+    const detailPage = await browser.newPage();
+    let enriched = 0;
+    
+    for (let i = 0; i < unique.length; i++) {
+      const event = unique[i];
+      try {
+        await detailPage.goto(event.url, { waitUntil: 'domcontentloaded', timeout: 15000 });
+        await detailPage.waitForTimeout(1500);
+        
+        const details = await detailPage.evaluate(() => {
+          const getText = (sel) => {
+            const el = document.querySelector(sel);
+            return el ? el.innerText.trim() : '';
+          };
+          const getAll = (sel) => Array.from(document.querySelectorAll(sel)).map(el => el.innerText.trim()).filter(t => t.length > 0);
+          
+          // Get all text content from the page
+          const bodyText = document.body.innerText || '';
+          
+          // --- DESCRIPTION ---
+          // Look for the main event description (usually in a specific container)
+          let description = '';
+          // Try common description selectors
+          const descSelectors = [
+            '[class*="description"]', '[class*="Description"]',
+            '[class*="event-info"]', '[class*="eventInfo"]',
+            '[class*="about"]', '[class*="details"]',
+            '.show-more-content', '[class*="content-body"]'
+          ];
+          for (const sel of descSelectors) {
+            const el = document.querySelector(sel);
+            if (el && el.innerText.trim().length > 30) {
+              description = el.innerText.trim();
+              break;
+            }
+          }
+          // Fallback: find paragraphs with substantial text
+          if (!description) {
+            const paras = Array.from(document.querySelectorAll('p, [class*="text"]'));
+            const longParas = paras.filter(p => p.innerText.trim().length > 50 && p.innerText.trim().length < 2000);
+            if (longParas.length > 0) {
+              description = longParas.map(p => p.innerText.trim()).join('\n\n');
+            }
+          }
+          // Clean: remove T&Cs boilerplate
+          if (description) {
+            const tcStart = description.indexOf('Organiser/Promoter/Venue');
+            if (tcStart > 100) description = description.substring(0, tcStart).trim();
+            const tcStart2 = description.indexOf('ShowsHappening Terms');
+            if (tcStart2 > 100) description = description.substring(0, tcStart2).trim();
+            const tcStart3 = description.indexOf('The booking fee is not');
+            if (tcStart3 > 100) description = description.substring(0, tcStart3).trim();
+            // Limit to 1000 chars
+            if (description.length > 1000) description = description.substring(0, 1000) + '...';
+          }
+          
+          // --- VENUE / LOCATION ---
+          let location = '';
+          // Look for "Where" section or venue name
+          const whereMatch = bodyText.match(/Where\s*\n\s*(.+)/i);
+          if (whereMatch) location = whereMatch[1].trim();
+          // Try venue-specific selectors
+          if (!location) {
+            const venueSelectors = ['[class*="venue"]', '[class*="Venue"]', '[class*="location"]', '[class*="Location"]', '[class*="where"]'];
+            for (const sel of venueSelectors) {
+              const el = document.querySelector(sel);
+              if (el && el.innerText.trim().length > 2 && el.innerText.trim().length < 100) {
+                location = el.innerText.trim();
+                break;
+              }
+            }
+          }
+          // Try finding text with "View map" nearby
+          if (!location) {
+            const mapLinks = Array.from(document.querySelectorAll('a'));
+            const mapLink = mapLinks.find(a => a.innerText.includes('View map'));
+            if (mapLink && mapLink.parentElement) {
+              const parentText = mapLink.parentElement.innerText.replace('View map', '').trim();
+              if (parentText.length > 2 && parentText.length < 150) location = parentText;
+            }
+          }
+          
+          // --- DATE (more precise from event page) ---
+          let dateDetail = '';
+          // Look for "When" section
+          const whenMatch = bodyText.match(/When\s*\n\s*(.+)/i);
+          if (whenMatch) dateDetail = whenMatch[1].trim();
+          // Try date-specific selectors
+          if (!dateDetail) {
+            const dateSelectors = ['[class*="date"]', '[class*="Date"]', '[class*="when"]', '[class*="When"]', 'time'];
+            for (const sel of dateSelectors) {
+              const el = document.querySelector(sel);
+              if (el && el.innerText.trim().length > 3 && el.innerText.trim().length < 100) {
+                dateDetail = el.innerText.trim();
+                break;
+              }
+            }
+          }
+          
+          // --- PRICE ---
+          let price = '';
+          const priceMatches = bodyText.match(/€[\d.,]+/g);
+          if (priceMatches) {
+            const prices = [...new Set(priceMatches)];
+            if (prices.length === 1) price = prices[0];
+            else if (prices.length > 1) price = 'From ' + prices.sort((a, b) => parseFloat(a.replace('€','')) - parseFloat(b.replace('€','')))[0];
+          }
+          if (!price && bodyText.toLowerCase().includes('free')) price = 'Free';
+          
+          // --- ORGANIZER ---
+          let organizer = '';
+          // Usually in the URL: showshappening.com/ORGANIZER/event-name
+          const urlParts = window.location.pathname.split('/').filter(p => p);
+          if (urlParts.length >= 2) {
+            organizer = decodeURIComponent(urlParts[0]).replace(/[-_]+/g, ' ');
+          }
+          
+          // --- IMAGE (higher quality from event page) ---
+          let image = '';
+          const ogImage = document.querySelector('meta[property="og:image"]');
+          if (ogImage) image = ogImage.getAttribute('content') || '';
+          if (!image) {
+            const imgs = Array.from(document.querySelectorAll('img'));
+            const eventImg = imgs.find(img => img.src && img.width > 200 && !img.src.includes('logo') && !img.src.includes('icon'));
+            if (eventImg) image = eventImg.src;
+          }
+          
+          return { description, location, dateDetail, price, organizer, image };
+        });
+        
+        // Merge details into event
+        if (details.description) event.description = details.description;
+        if (details.location && details.location.length > 2) event.location = details.location;
+        if (details.dateDetail && !event.date) event.date = details.dateDetail;
+        if (details.price && !event.price) event.price = details.price;
+        if (details.organizer) event.organizer = details.organizer;
+        if (details.image && details.image.startsWith('http')) event.image_url = details.image;
+        
+        enriched++;
+        if (i % 10 === 0) console.log(`  Progress: ${i+1}/${unique.length} pages visited...`);
+        
+      } catch (detailErr) {
+        // Skip if page fails - keep homepage data
+        console.log(`  Skipped ${event.title}: ${detailErr.message}`);
+      }
+    }
+    
+    await detailPage.close();
+    console.log(`  Enriched ${enriched}/${unique.length} events with page details.`);
+
+    // Step 3: Save to database
     for (const event of unique) {
       try {
+        // Build description with price info
+        let desc = event.description || '';
+        if (event.price && !desc.includes(event.price)) {
+          desc = desc ? `Price: ${event.price}\n\n${desc}` : `Price: ${event.price}`;
+        }
+        
         await pool.query(
-          `INSERT INTO events (title, location, source_url, image_url, event_date, description) 
-           VALUES ($1, $2, $3, $4, $5, $6) 
+          `INSERT INTO events (title, location, source_url, image_url, event_date, description, source_name) 
+           VALUES ($1, $2, $3, $4, $5, $6, $7) 
            ON CONFLICT (source_url) DO UPDATE SET 
              title = EXCLUDED.title,
-             image_url = EXCLUDED.image_url,
+             image_url = COALESCE(NULLIF(EXCLUDED.image_url, ''), events.image_url),
              event_date = COALESCE(EXCLUDED.event_date, events.event_date),
-             description = COALESCE(EXCLUDED.description, events.description)`,
+             description = CASE WHEN LENGTH(EXCLUDED.description) > LENGTH(COALESCE(events.description, '')) THEN EXCLUDED.description ELSE events.description END,
+             location = CASE WHEN EXCLUDED.location != 'Malta' THEN EXCLUDED.location ELSE events.location END,
+             source_name = COALESCE(EXCLUDED.source_name, events.source_name)`,
           [
             event.title,
-            'Malta',
+            event.location || 'Malta',
             event.url,
             event.image_url,
             event.date || null,
-            event.price ? `Price: ${event.price}` : null
+            desc || null,
+            event.organizer ? `ShowsHappening · ${event.organizer}` : 'ShowsHappening'
           ]
         );
       } catch (dbErr) {
-        if (dbErr.message.includes('column')) {
-          await pool.query(
-            'INSERT INTO events (title, location, source_url, image_url) VALUES ($1, $2, $3, $4) ON CONFLICT (source_url) DO UPDATE SET image_url = EXCLUDED.image_url',
-            [event.title, 'Malta', event.url, event.image_url]
-          );
-        }
+        console.log(`  DB error for ${event.title}: ${dbErr.message}`);
       }
     }
 
+    const withDesc = unique.filter(e => e.description).length;
+    const withLoc = unique.filter(e => e.location && e.location !== 'Malta').length;
     const withDates = unique.filter(e => e.date).length;
     const withPrices = unique.filter(e => e.price).length;
-    console.log(`ShowsHappening: ${unique.length} events (${withDates} with dates, ${withPrices} with prices).`);
+    console.log(`ShowsHappening: ${unique.length} events (${withDesc} with descriptions, ${withLoc} with venues, ${withDates} with dates, ${withPrices} with prices).`);
     
     if (unique.length > 0) {
       console.log("\n  === SAMPLE EVENTS ===");
       unique.slice(0, 5).forEach(e => {
         console.log(`  Title: ${e.title}`);
         console.log(`  Date:  ${e.date || 'N/A'}`);
+        console.log(`  Venue: ${e.location || 'N/A'}`);
         console.log(`  Price: ${e.price || 'N/A'}`);
+        console.log(`  Desc:  ${(e.description || 'N/A').substring(0, 100)}...`);
         console.log(`  URL:   ${e.url}`);
         console.log(`  ---`);
       });
