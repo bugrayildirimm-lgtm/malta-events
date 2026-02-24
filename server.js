@@ -554,16 +554,20 @@ app.get('/', async (req, res) => {
         if (event.source_name) {
           event.source_name = event.source_name.trim().replace(/\s+/g, ' ');
         }
-        // Collect filter data
-        const srcName = event.source_name
+        // Consolidate source names into clean groups
+        let srcName = event.source_name
           || (event.source_url && event.source_url.includes('showshappening') ? 'ShowsHappening' : null)
           || (event.source_url && event.source_url.includes('visitmalta') ? 'VisitMalta' : null)
+          || (event.source_url && event.source_url.includes('ra.co') ? 'Resident Advisor' : null)
+          || (event.source_url && event.source_url.includes('eventworks') ? 'EventWorks' : null)
+          || (event.source_url && event.source_url.includes('biljett') ? 'Biljett.mt' : null)
           || (event.source_url && event.source_url.includes('eventbrite') ? 'Eventbrite' : null);
+        // Consolidate ShowsHappening sub-sources
+        if (srcName && (srcName.includes('ShowsHappening') || srcName.includes('Show Happening'))) srcName = 'ShowsHappening';
+        if (srcName && srcName.includes('Community Events')) srcName = 'Community Events Malta';
         if (srcName) {
-          // Deduplicate by comparing lowercase
-          const existing = Array.from(sources).find(s => s.toLowerCase() === srcName.toLowerCase());
-          if (!existing) sources.add(srcName);
-          else event.source_name = existing; // normalize to the first version seen
+          event.source_name = srcName; // normalize
+          sources.add(srcName);
         }
         if (event.location && event.location !== 'Malta') locations.add(event.location);
         if (event.category) categories.add(event.category);
