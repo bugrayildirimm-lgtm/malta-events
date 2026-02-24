@@ -175,15 +175,53 @@ function getStartDate(dateStr) {
     const y = new Date().getFullYear();
     return new Date(y, monthToNum(mr[2]), mr[1] ? +mr[1] : 1);
   }
+  // Multi-day: "7,8,14,15,21,22,28 Feb" — find the NEXT upcoming date
   const multiDay = dateStr.match(/^([\d,\s]+)\s+([A-Za-z]{3,})$/);
   if (multiDay && monthToNum(multiDay[2]) !== null) {
-    const day = +multiDay[1].split(',')[0].trim();
+    const days = multiDay[1].split(',').map(d=>+d.trim()).filter(d=>d).sort((a,b)=>a-b);
     const y = new Date().getFullYear();
-    const d = new Date(y, monthToNum(multiDay[2]), day);
-    if (d < Date.now() - 60*86400000) d.setFullYear(y+1);
+    const month = monthToNum(multiDay[2]);
+    const now = new Date(); now.setHours(0,0,0,0);
+    // Find the next date that hasn't passed yet
+    for (const day of days) {
+      let d = new Date(y, month, day);
+      if (d < now - 60*86400000) d.setFullYear(y+1);
+      if (d >= now) return d;
+    }
+    // All dates passed — return first date (with year bump if needed)
+    const d = new Date(y, month, days[0]);
+    if (d < now - 60*86400000) d.setFullYear(y+1);
     return d;
   }
   return parseSingleDate(dateStr);
+}
+
+// Get the next upcoming date for sorting (handles multi-date and ranges)
+function getNextDate(dateStr) {
+  if (!dateStr) return null;
+  const now = new Date(); now.setHours(0,0,0,0);
+  
+  // Multi-day: "7,8,14,15,21,22,28 Feb"
+  const multiDay = dateStr.match(/^([\d,\s]+)\s+([A-Za-z]{3,})$/);
+  if (multiDay && monthToNum(multiDay[2]) !== null) {
+    const days = multiDay[1].split(',').map(d=>+d.trim()).filter(d=>d).sort((a,b)=>a-b);
+    const y = new Date().getFullYear();
+    const month = monthToNum(multiDay[2]);
+    for (const day of days) {
+      let d = new Date(y, month, day);
+      if (d < now - 60*86400000) d.setFullYear(y+1);
+      if (d >= now) return d;
+    }
+  }
+  
+  // Range: sort by today if we're within the range
+  const startDate = getStartDate(dateStr);
+  const endDate = getEndDate(dateStr);
+  if (startDate && endDate && startDate <= now && endDate >= now) {
+    return now; // ongoing — treat as "today"
+  }
+  
+  return startDate;
 }
 
 function looksLikeDate(str) {
@@ -205,22 +243,39 @@ function getDateBadge(dateStr) {
     const s = extractDM(parts[0].trim());
     const e = extractDM(parts[1].trim());
     if (s && e) {
-      if (s.month === e.month) return badge(s.month, s.day + '-' + e.day);
-      return badge(s.month + '→' + e.month, s.day + '→' + e.day);
+      if (s.month === e.month) return badge(s.month, s.day + '-' + e.day, true);
+      return badge(s.month + '→' + e.month, s.day + '→' + e.day, true);
     }
   }
   let mr = dateStr.match(/(?:(\d{1,2})[- ])?([A-Za-z]{3,})\s+to\s+(?:(\d{1,2})[- ])?([A-Za-z]{3,})/i);
   if (mr) {
     const m1 = (mr[2]||'').substring(0,3).toUpperCase();
     const m2 = (mr[4]||'').substring(0,3).toUpperCase();
-    if (mr[1] && mr[3]) return badge(m1 + '→' + m2, mr[1] + '→' + mr[3]);
-    return badge(m1 + '→' + m2, 'Ongoing');
+    if (mr[1] && mr[3]) return badge(m1 + '→' + m2, mr[1] + '→' + mr[3], true);
+    return badge(m1 + '→' + m2, 'Ongoing', true);
   }
   const multiDay = dateStr.match(/^([\d,\s]+)\s+([A-Za-z]{3,})$/);
   if (multiDay) {
     const days = multiDay[1].split(',').map(d=>d.trim()).filter(d=>d);
     const month = multiDay[2].substring(0,3).toUpperCase();
-    return badge(month, days.length > 2 ? days[0] + '-' + days[days.length-1] : days.join(','));
+    const monthNum = monthToNum(multiDay[2]);
+    
+    if (monthNum !== null && days.length > 1) {
+      // Find the next upcoming date
+      const now = new Date(); now.setHours(0,0,0,0);
+      const y = new Date().getFullYear();
+      let nextDay = null;
+      for (const d of days.map(Number).sort((a,b)=>a-b)) {
+        let dt = new Date(y, monthNum, d);
+        if (dt < now - 60*86400000) dt.setFullYear(y+1);
+        if (dt >= now) { nextDay = d; break; }
+      }
+      if (nextDay) {
+        return badge(month, nextDay, true);
+      }
+      return badge(month, days[0] + '-' + days[days.length-1], true);
+    }
+    return badge(month, days.length > 2 ? days[0] + '-' + days[days.length-1] : days.join(','), true);
   }
   const p = extractDM(dateStr);
   if (p) return badge(p.month, p.day);
@@ -231,8 +286,9 @@ function extractDM(s) {
   if (m) return { day: m[1], month: m[2].substring(0,3).toUpperCase() };
   return null;
 }
-function badge(top, bottom) {
-  return '<div class="date-badge"><div class="date-month">' + top + '</div><div class="date-day">' + bottom + '</div></div>';
+function badge(top, bottom, isMulti) {
+  const multiDot = isMulti ? '<div style="font-size:0.55rem;color:#fbbf24;margin-top:1px">● ● ●</div>' : '';
+  return '<div class="date-badge"><div class="date-month">' + top + '</div><div class="date-day">' + bottom + '</div>' + multiDot + '</div>';
 }
 
 // =====================================================================
@@ -267,9 +323,20 @@ const createCard = (event, isPast) => {
     const dateHTML = getDateBadge(event.event_date);
     let desc = event.description || '';
     if (!desc || desc === 'null') desc = '';
-    const hasRange = event.event_date && (event.event_date.includes(' - ') || /to/i.test(event.event_date));
-    const dateInfo = hasRange ? '<div class="date-range-text">📅 ' + event.event_date + '</div>' : '';
-    const recurTag = event.recurring ? '<div class="recurring-tag">🔁 ' + event.recurring + '</div>' : '';
+    
+    // Detect multi-date events
+    const hasRange = event.event_date && (event.event_date.includes(' - ') || / to /i.test(event.event_date));
+    const isMultiDay = event.event_date && /^\d[\d,\s]+\s+[A-Za-z]/.test(event.event_date) && event.event_date.includes(',');
+    const isRecurring = !!(event.recurring && event.recurring.trim());
+    
+    // Build date info line
+    let dateInfo = '';
+    if (isMultiDay) {
+      dateInfo = '<div class="multi-date-tag">📅 Multiple dates: ' + event.event_date + '</div>';
+    } else if (hasRange) {
+      dateInfo = '<div class="date-range-text">📅 ' + event.event_date + '</div>';
+    }
+    const recurTag = isRecurring ? '<div class="recurring-tag">🔁 ' + event.recurring + '</div>' : '';
     if (!desc) desc = 'Click details to see more about this event.';
     const loc = event.location && event.location !== 'Malta' ? event.location : '';
     const locHTML = loc ? '<div class="location">📍 ' + loc + '</div>' : '';
@@ -574,10 +641,20 @@ app.get('/', async (req, res) => {
 
         const endDate = getEndDate(event.event_date);
         const startDate = getStartDate(event.event_date);
-        if (!endDate || endDate >= today) {
-          let sortDate = startDate;
-          if (startDate && startDate < today) sortDate = new Date(today);
-          upcoming.push({ ...event, _sort: sortDate });
+        const nextDate = getNextDate(event.event_date);
+        
+        // Recurring events with no parseable date are always "upcoming" and sort to today
+        const isRecurring = !!(event.recurring && event.recurring.trim());
+        
+        if (isRecurring && !startDate && !endDate) {
+          // Recurring with no date — it's ongoing, sort to today
+          upcoming.push({ ...event, _sort: new Date(today), _isRecurring: true });
+        } else if (!endDate || endDate >= today) {
+          let sortDate = nextDate || startDate;
+          if (sortDate && sortDate < today) sortDate = new Date(today);
+          // Recurring events that have a date range: sort to today if within range
+          if (isRecurring && !sortDate) sortDate = new Date(today);
+          upcoming.push({ ...event, _sort: sortDate, _isRecurring: isRecurring });
         } else {
           past.push({ ...event, _sort: endDate });
         }
@@ -742,6 +819,7 @@ app.get('/', async (req, res) => {
     .title { font-size:1.25rem; font-weight:800; margin-bottom:0.75rem; line-height:1.3; color:#0f172a; }
     .location { font-size:0.85rem; color:#64748b; margin-bottom:0.5rem; }
     .date-range-text { font-size:0.8rem; color:#0f172a; margin-bottom:0.5rem; font-weight:500; }
+    .multi-date-tag { display:inline-block; background:#fef3c7; color:#92400e; font-size:0.75rem; font-weight:600; padding:3px 10px; border-radius:20px; margin-bottom:8px; }
     .description { font-size:0.9rem; color:#475569; margin-bottom:1.5rem; line-height:1.6; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
     .btn { margin-top:auto; display:block; width:100%; padding:15px; background:#0f172a; color:white; text-align:center; text-decoration:none; border-radius:12px; font-weight:700; font-size:1rem; transition:0.3s; box-shadow:0 4px 12px rgba(15,23,42,0.15); }
     .btn:hover { background:var(--primary); box-shadow:0 8px 20px rgba(255,56,92,0.3); transform:translateY(-2px); }
