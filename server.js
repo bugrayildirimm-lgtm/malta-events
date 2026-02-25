@@ -697,6 +697,22 @@ app.get('/', async (req, res) => {
 
     const result = await pool.query("SELECT * FROM events WHERE COALESCE(status, 'live') = 'live'");
     const allEvents = result.rows;
+    
+    // Clean up location data
+    allEvents.forEach(event => {
+      if (event.location) {
+        event.location = event.location
+          .replace(/\s*View map\s*/gi, '')
+          .replace(/,\s*Malta\s*$/i, '')
+          .replace(/,\s*Malta,\s*/i, ', ')
+          .replace(/\s+/g, ' ')
+          .trim();
+        if (event.location.toLowerCase() === 'malta' || event.location.length < 3) {
+          event.location = 'Malta';
+        }
+      }
+    });
+    
     const today = new Date(); today.setHours(0,0,0,0);
 
     // Auto-generate slugs for events without them
@@ -3321,6 +3337,28 @@ app.get('/admin/api/drafts', async (req, res) => {
   } catch (e) {
     res.json([]);
   }
+});
+
+// Clean up locations in database (removes "View map", ", Malta" etc)
+app.post('/admin/api/cleanup-locations', async (req, res) => {
+  if (!authCheck(req, res)) return;
+  try {
+    const result = await pool.query("SELECT id, location FROM events WHERE location IS NOT NULL AND (location LIKE '%View map%' OR location LIKE '%, Malta%')");
+    let fixed = 0;
+    for (const row of result.rows) {
+      let loc = row.location
+        .replace(/\s*View map\s*/gi, '')
+        .replace(/,\s*Malta\s*$/i, '')
+        .replace(/,\s*Malta,\s*/i, ', ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (loc !== row.location) {
+        await pool.query('UPDATE events SET location = $1 WHERE id = $2', [loc, row.id]);
+        fixed++;
+      }
+    }
+    res.json({ ok: true, fixed, checked: result.rows.length });
+  } catch (e) { res.json({ error: e.message }); }
 });
 
 // Remove duplicate events - keeps the one with most data

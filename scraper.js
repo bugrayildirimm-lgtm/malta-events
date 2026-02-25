@@ -228,8 +228,16 @@ async function scrapeShowsHappening(browser) {
         });
         
         // Merge details into event
+        if (details.location && details.location.length > 2) {
+          // Clean up ShowsHappening location format
+          let loc = details.location;
+          loc = loc.replace(/\s*View map\s*/gi, '').trim();
+          loc = loc.replace(/,\s*Malta\s*$/i, '').trim();
+          loc = loc.replace(/,\s*Malta,\s*/i, ', ').trim();
+          loc = loc.replace(/\s+/g, ' ');
+          if (loc.length > 2 && loc.toLowerCase() !== 'malta') event.location = loc;
+        }
         if (details.description) event.description = details.description;
-        if (details.location && details.location.length > 2) event.location = details.location;
         if (details.dateDetail && !event.date) event.date = details.dateDetail;
         if (details.price && !event.price) event.price = details.price;
         if (details.organizer) event.organizer = details.organizer;
