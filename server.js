@@ -1013,10 +1013,12 @@ app.get('/', async (req, res) => {
   ${(() => {
     const featured = allEvents.filter(e => e.featured);
     if (featured.length === 0) return '';
+    const fCount = featured.length;
+    const gridCols = fCount === 1 ? 'grid-template-columns:1fr' : fCount === 2 ? 'grid-template-columns:repeat(2,1fr)' : 'grid-template-columns:repeat(auto-fill,minmax(300px,1fr))';
     return `
-    <div style="max-width:1400px;margin:0 auto;padding:0 20px 20px">
+    <div style="max-width:${fCount <= 2 ? '800' : '1400'}px;margin:0 auto;padding:0 20px 20px">
       <h2 style="font-size:1.3rem;font-weight:800;margin:0 0 15px;color:#1e293b">⭐ Featured Events</h2>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px">
+      <div style="display:grid;${gridCols};gap:16px">
         ${featured.map(e => {
           const slug = e.slug || generateSlug(e.title);
           const img = e.image_url && e.image_url.startsWith('http') ? e.image_url : '';
