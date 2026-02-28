@@ -832,6 +832,8 @@ app.get('/', async (req, res) => {
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preconnect" href="https://images.pexels.com">
+  <link rel="preload" as="image" href="https://images.pexels.com/photos/34699762/pexels-photo-34699762.jpeg?auto=compress&cs=tinysrgb&w=800&h=450&dpr=1" media="(max-width:767px)">
+  <link rel="preload" as="image" href="https://images.pexels.com/photos/34699762/pexels-photo-34699762.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1" media="(min-width:768px)">
   <meta name="description" content="Discover the best events happening in Malta and Gozo. Browse concerts, festivals, theatre shows, nightlife parties, sports, food events and cultural activities across the Maltese islands. Updated daily.">
   <meta name="keywords" content="Malta events, things to do in Malta, Malta concerts, Malta festivals, Malta nightlife, Gozo events, what's on Malta, Malta 2026, Malta carnival, Malta theatre, events in Valletta, Malta parties, Malta sports">
   <meta name="author" content="Malta Event Guide">
@@ -897,12 +899,14 @@ app.get('/', async (req, res) => {
   }
   </script>
 
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;700;900&display=swap" rel="stylesheet">
+  <link rel="preload" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;700;900&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript><link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;700;900&display=swap" rel="stylesheet"></noscript>
   <style>
     :root { --bg: #f8fafc; --card-bg: #fff; --text: #1e293b; --primary: #FF385C; }
-    body { font-family: 'Outfit', sans-serif; background: var(--bg); margin: 0; color: var(--text); padding-bottom: 50px; }
+    body { font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); margin: 0; color: var(--text); padding-bottom: 50px; }
     
-    header { position: relative; background-image: url('https://images.pexels.com/photos/34699762/pexels-photo-34699762.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1'); background-size: cover; background-position: center; color: white; text-align: center; padding: 6rem 1rem 8rem; margin-bottom: 80px; }
+    header { position: relative; background-image: url('https://images.pexels.com/photos/34699762/pexels-photo-34699762.jpeg?auto=compress&cs=tinysrgb&w=800&h=450&dpr=1'); background-size: cover; background-position: center; color: white; text-align: center; padding: 6rem 1rem 8rem; margin-bottom: 80px; }
+    @media(min-width:768px) { header { background-image: url('https://images.pexels.com/photos/34699762/pexels-photo-34699762.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1'); } }
     .header-overlay { position: absolute; top:0;left:0;right:0;bottom:0; background: rgba(15,23,42,0.75); z-index:1; }
     .header-content { position: relative; z-index:2; max-width: 800px; margin: 0 auto; }
     h1 { margin:0; font-size:3.5rem; font-weight:900; letter-spacing:-1px; text-shadow: 0 4px 10px rgba(0,0,0,0.3); }
@@ -919,7 +923,7 @@ app.get('/', async (req, res) => {
     .filter-bar select:focus { outline:none; border-color:var(--primary); }
     .filter-bar .reset-btn { padding:10px 18px; border-radius:25px; border:1px solid #e2e8f0; background:white; font-family:inherit; font-size:0.85rem; color:#64748b; cursor:pointer; transition:0.2s; }
     .filter-bar .reset-btn:hover { background:#f1f5f9; color:var(--primary); border-color:var(--primary); }
-    .filter-bar .filter-count { font-size:0.85rem; color:#94a3b8; }
+    .filter-bar .filter-count { font-size:0.85rem; color:#64748b; }
     .quick-filters { max-width:1200px; margin:0 auto 15px; padding:0 20px; display:flex; gap:8px; flex-wrap:wrap; }
     .qf-btn { padding:8px 18px; border-radius:25px; border:2px solid #e2e8f0; background:white; font-family:inherit; font-size:0.85rem; font-weight:600; color:#475569; cursor:pointer; transition:0.2s; }
     .qf-btn:hover { border-color:var(--primary); color:var(--primary); }
@@ -989,6 +993,7 @@ app.get('/', async (req, res) => {
     </div>
   </header>
 
+  <main>
   <div class="quick-filters">
     <button class="qf-btn" onclick="quickFilter('today',this)">🔥 Today</button>
     <button class="qf-btn" onclick="quickFilter('tomorrow',this)">📅 Tomorrow</button>
@@ -998,19 +1003,19 @@ app.get('/', async (req, res) => {
     <button class="qf-btn" onclick="quickFilter('all',this)">All</button>
   </div>
   <div class="filter-bar">
-    <select id="sourceSelect" onchange="filterEvents()">
+    <select id="sourceSelect" onchange="filterEvents()" aria-label="Filter by source">
       <option value="">All Sources</option>
       ${sourceOptions}
     </select>
-    <select id="categorySelect" onchange="filterEvents()">
+    <select id="categorySelect" onchange="filterEvents()" aria-label="Filter by event type">
       <option value="">All Types</option>
       ${categoryOptions}
     </select>
-    <select id="monthSelect" onchange="filterEvents()">
+    <select id="monthSelect" onchange="filterEvents()" aria-label="Filter by month">
       <option value="">All Months</option>
       ${monthOptions}
     </select>
-    <select id="showSelect" onchange="filterEvents()">
+    <select id="showSelect" onchange="filterEvents()" aria-label="Filter upcoming or past events">
       <option value="upcoming">Upcoming Only</option>
       <option value="all">All Events</option>
       <option value="past">Past Only</option>
@@ -1197,7 +1202,7 @@ app.get('/', async (req, res) => {
     <div style="background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);border-radius:20px;padding:35px;text-align:center;color:white">
       <div style="font-size:2rem;margin-bottom:5px">📬</div>
       <h2 style="margin:0 0 8px;font-size:1.3rem;font-weight:800">Never Miss an Event in Malta</h2>
-      <p style="color:#94a3b8;font-size:0.9rem;margin:0 0 20px">Get weekly updates on the best events, festivals & things to do in Malta and Gozo.</p>
+      <p style="color:#b0bec5;font-size:0.9rem;margin:0 0 20px">Get weekly updates on the best events, festivals & things to do in Malta and Gozo.</p>
       <div style="display:flex;gap:8px;max-width:420px;margin:0 auto;flex-wrap:wrap" id="emailForm">
         <input type="email" id="subEmail" placeholder="Your email address" style="flex:1;min-width:200px;padding:12px 16px;border-radius:12px;border:2px solid #334155;background:#1e293b;color:white;font-family:inherit;font-size:0.9rem;outline:none" onfocus="this.style.borderColor='#FF385C'" onblur="this.style.borderColor='#334155'">
         <button onclick="subscribeEmail()" style="padding:12px 24px;border-radius:12px;border:none;background:#FF385C;color:white;font-family:inherit;font-weight:700;font-size:0.9rem;cursor:pointer;white-space:nowrap;transition:0.2s;flex-shrink:0" onmouseover="this.style.background='#e11d48'" onmouseout="this.style.background='#FF385C'">Subscribe</button>
@@ -1238,7 +1243,8 @@ app.get('/', async (req, res) => {
     document.getElementById('subEmail').addEventListener('keypress',function(e){if(e.key==='Enter')subscribeEmail()});
   </script>
 
-  <footer style="margin-top:60px;padding:40px 20px;background:#1e293b;color:#94a3b8;text-align:center;font-size:0.85rem;line-height:1.8">
+  </main>
+  <footer style="margin-top:60px;padding:40px 20px;background:#1e293b;color:#b0bec5;text-align:center;font-size:0.85rem;line-height:1.8">
     <div style="max-width:800px;margin:0 auto">
       <a href="/"><img src="/logo.png" alt="Malta Event Guide" style="height:60px;margin-bottom:10px"></a>
       <p>Your complete guide to events in Malta and Gozo. Discover concerts, festivals, theatre, nightlife, sports, arts and cultural events happening across the Maltese islands.</p>
@@ -1313,6 +1319,7 @@ app.get('/', async (req, res) => {
 // =====================================================================
 app.get('/event/:slug', async (req, res) => {
   try {
+    res.set('Cache-Control', 'public, max-age=300, s-maxage=600');
     const slug = req.params.slug;
     const result = await pool.query('SELECT * FROM events WHERE slug = $1', [slug]);
     if (!result.rows.length) return res.redirect('/');
@@ -1550,7 +1557,7 @@ app.get('/event/:slug', async (req, res) => {
     <div style="background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);border-radius:20px;padding:35px;text-align:center;color:white">
       <div style="font-size:2rem;margin-bottom:5px">📬</div>
       <h2 style="margin:0 0 8px;font-size:1.3rem;font-weight:800">Never Miss an Event in Malta</h2>
-      <p style="color:#94a3b8;font-size:0.9rem;margin:0 0 20px">Get weekly updates on the best events, festivals & things to do in Malta and Gozo.</p>
+      <p style="color:#b0bec5;font-size:0.9rem;margin:0 0 20px">Get weekly updates on the best events, festivals & things to do in Malta and Gozo.</p>
       <div style="display:flex;gap:8px;max-width:420px;margin:0 auto;flex-wrap:wrap">
         <input type="email" id="subEmail" placeholder="Your email address" style="flex:1;min-width:200px;padding:12px 16px;border-radius:12px;border:2px solid #334155;background:#1e293b;color:white;font-family:inherit;font-size:0.9rem;outline:none" onfocus="this.style.borderColor='#FF385C'" onblur="this.style.borderColor='#334155'">
         <button onclick="subscribeEmail()" style="padding:12px 24px;border-radius:12px;border:none;background:#FF385C;color:white;font-family:inherit;font-weight:700;font-size:0.9rem;cursor:pointer;white-space:nowrap;transition:0.2s;flex-shrink:0" onmouseover="this.style.background='#e11d48'" onmouseout="this.style.background='#FF385C'">Subscribe</button>
