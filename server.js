@@ -466,7 +466,7 @@ const createCard = (event, isPast) => {
         <div class="card-media">
             ${dateHTML} ${expired}
             <div class="fallback" style="background: ${bgStyle}; position:absolute;top:0;left:0;z-index:1;">${firstLetter}</div>
-            ${hasImg ? '<img src="' + event.image_url + '" class="card-img" style="position:relative;z-index:2;" onerror="this.hidden=1">' : ''}
+            ${hasImg ? '<img src="' + event.image_url + '" alt="' + (event.title||'').replace(/"/g,'&quot;') + ' in Malta" class="card-img" style="position:relative;z-index:2;" loading="lazy" width="400" height="220" onerror="this.hidden=1">' : ''}
         </div>
         </a>
         <div class="card-content">
@@ -529,12 +529,14 @@ app.get('/sitemap.xml', async (req, res) => {
   const today = new Date().toISOString().split('T')[0];
   let eventUrls = '';
   try {
-    const result = await pool.query('SELECT slug FROM events WHERE slug IS NOT NULL');
-    eventUrls = result.rows.map(r => `  <url>
+    const result = await pool.query("SELECT slug, event_date FROM events WHERE slug IS NOT NULL AND COALESCE(status,'live') = 'live'");
+    eventUrls = result.rows
+      .filter(r => r.slug && r.slug.length > 2)
+      .map(r => `  <url>
     <loc>https://maltaeventguide.com/event/${r.slug}</loc>
     <lastmod>${today}</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
+    <priority>0.7</priority>
   </url>`).join('\n');
   } catch(e) {}
   const catPages = ['music-events-malta','nightlife-malta','festivals-malta','theatre-shows-malta','arts-culture-malta','sports-events-malta','food-drink-events-malta','family-events-malta','free-events-malta'];
@@ -684,6 +686,9 @@ Object.entries(categoryPages).forEach(([slug, config]) => {
 // =====================================================================
 app.get('/', async (req, res) => {
   try {
+    // Cache for 5 minutes - gives Google stable content
+    res.set('Cache-Control', 'public, max-age=300, s-maxage=600');
+    
     // Merge event_overrides (manual images/categories) back into events
     // This is what makes manual edits survive TRUNCATE + re-scrape
     try {
@@ -816,7 +821,7 @@ app.get('/', async (req, res) => {
     const categoryOptions = standardCategories.filter(c => categories.has(c)).map(c => '<option value="' + c.toLowerCase() + '">' + c + '</option>').join('');
 
     const html = `<!DOCTYPE html>
-<html lang="en">
+<html lang="en-MT">
 <head>
   <meta charset="UTF-8">
   <!-- Google Analytics -->
@@ -824,6 +829,9 @@ app.get('/', async (req, res) => {
   <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag('js',new Date());gtag('config','G-YMT2MSCCRZ');</script>
   <title>Malta Events 2026 | Concerts, Festivals, Nightlife & Things to Do in Malta</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://images.pexels.com">
   <meta name="description" content="Discover the best events happening in Malta and Gozo. Browse concerts, festivals, theatre shows, nightlife parties, sports, food events and cultural activities across the Maltese islands. Updated daily.">
   <meta name="keywords" content="Malta events, things to do in Malta, Malta concerts, Malta festivals, Malta nightlife, Gozo events, what's on Malta, Malta 2026, Malta carnival, Malta theatre, events in Valletta, Malta parties, Malta sports">
   <meta name="author" content="Malta Event Guide">
@@ -879,7 +887,8 @@ app.get('/', async (req, res) => {
           "name": ${JSON.stringify(e.location || 'Malta')},
           "address": { "@type": "PostalAddress", "addressCountry": "MT" }
         }${e._sort ? `,
-        "startDate": "${e._sort.toISOString().split('T')[0]}"` : ''}${e.description ? `,
+        "startDate": "${e._sort.toISOString().split('T')[0]}"` : `,
+        "startDate": "${new Date().toISOString().split('T')[0]}"`}${e.description ? `,
         "description": ${JSON.stringify(e.description.substring(0, 200))}` : ''}${e.image_url ? `,
         "image": ${JSON.stringify(e.image_url)}` : ''}${e.source_url && !e.source_url.startsWith('manual') ? `,
         "url": ${JSON.stringify(e.source_url)}` : ''}
@@ -1023,7 +1032,7 @@ app.get('/', async (req, res) => {
           const slug = e.slug || generateSlug(e.title);
           const img = e.image_url && e.image_url.startsWith('http') ? e.image_url : '';
           return `<a href="/event/${slug}" style="text-decoration:none;display:block;background:white;border-radius:16px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);border:2px solid #fbbf24;transition:0.2s" onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 8px 25px rgba(0,0,0,0.12)'" onmouseout="this.style.transform='';this.style.boxShadow='0 2px 12px rgba(0,0,0,0.08)'">
-            ${img ? `<div style="height:180px;overflow:hidden"><img src="${img}" alt="${(e.title||'').replace(/"/g,'&quot;')}" style="width:100%;height:100%;object-fit:cover"></div>` : ''}
+            ${img ? `<div style="height:180px;overflow:hidden"><img src="${img}" alt="${(e.title||'').replace(/"/g,'&quot;')} — event in Malta" loading="lazy" width="400" height="180" style="width:100%;height:100%;object-fit:cover"></div>` : ''}
             <div style="padding:14px">
               <div style="font-size:0.7rem;font-weight:700;color:#f59e0b;text-transform:uppercase;margin-bottom:4px">⭐ Featured</div>
               <div style="font-size:1rem;font-weight:700;color:#0f172a">${e.title}</div>
@@ -1198,6 +1207,21 @@ app.get('/', async (req, res) => {
     </div>
   </div>
 
+  <section style="max-width:900px;margin:60px auto 0;padding:0 20px;color:#334155;font-size:0.95rem;line-height:1.8">
+    <h2 style="font-size:1.5rem;font-weight:800;color:#0f172a;margin:0 0 15px">Your Complete Guide to Events in Malta & Gozo</h2>
+    <p>Malta Event Guide is the most comprehensive events listing for the Maltese islands. Whether you are a local looking for something to do this weekend or a visitor planning your trip, our guide covers everything happening across Malta and Gozo — from live music concerts and theatre shows in Valletta to nightlife parties in Paceville, family days out in Mdina, and cultural festivals island-wide.</p>
+    <p>We aggregate events from trusted sources including ShowsHappening, VisitMalta, Resident Advisor, and local organisers, then update our listings daily so you always see what is coming up. Every event includes the date, venue, and a direct link to buy tickets or find out more.</p>
+
+    <h3 style="font-size:1.15rem;font-weight:700;color:#0f172a;margin:30px 0 10px">What Types of Events Can You Find?</h3>
+    <p>Our guide covers <a href="/music-events-malta" style="color:#FF385C;text-decoration:underline">live music and concerts</a>, <a href="/nightlife-malta" style="color:#FF385C;text-decoration:underline">nightlife and club events</a>, <a href="/festivals-malta" style="color:#FF385C;text-decoration:underline">festivals</a>, <a href="/theatre-shows-malta" style="color:#FF385C;text-decoration:underline">theatre and shows</a>, <a href="/arts-culture-malta" style="color:#FF385C;text-decoration:underline">arts and culture</a>, <a href="/sports-events-malta" style="color:#FF385C;text-decoration:underline">sports and adventure</a>, <a href="/food-drink-events-malta" style="color:#FF385C;text-decoration:underline">food and drink experiences</a>, <a href="/family-events-malta" style="color:#FF385C;text-decoration:underline">family-friendly activities</a>, and <a href="/free-events-malta" style="color:#FF385C;text-decoration:underline">free events</a>. Use the filters above to narrow by category, date, or source.</p>
+
+    <h3 style="font-size:1.15rem;font-weight:700;color:#0f172a;margin:30px 0 10px">Popular Events This Month</h3>
+    <p>Malta has a packed calendar throughout the year. During carnival season in February you will find parades in Valletta and Nadur, while spring brings Holy Week processions and the Malta International Fireworks Festival. Summer is peak season with festivals like Isle of MTV, BeerFest, and numerous boat parties and pool events. Autumn features Notte Bianca and BirguFest, and winter brings the Malta Christmas markets, New Year celebrations, and the Baroque Festival at some of the island's most historic venues.</p>
+
+    <h3 style="font-size:1.15rem;font-weight:700;color:#0f172a;margin:30px 0 10px">How to Use Malta Event Guide</h3>
+    <p>Search by keyword, filter by date or category, or browse our curated category pages to find exactly what you are looking for. Each event links directly to its official source so you can buy tickets or get directions. We also feature handpicked events at the top of the page so you never miss the highlights. Bookmark us and check back regularly — new events are added every day.</p>
+  </section>
+
   <script>
     function subscribeEmail(){
       var email=document.getElementById('subEmail').value.trim();
@@ -1326,11 +1350,14 @@ app.get('/event/:slug', async (req, res) => {
 
     // Structured data for this specific event
     const startDate = getStartDate(event.event_date);
+    const endDate = getEndDate(event.event_date);
     const jsonLd = {
       "@context": "https://schema.org",
       "@type": "Event",
       "name": title,
       "description": event.description || desc,
+      "startDate": startDate ? startDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+      "endDate": endDate ? endDate.toISOString().split('T')[0] : (startDate ? startDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0]),
       "eventStatus": "https://schema.org/EventScheduled",
       "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
       "location": {
@@ -1344,18 +1371,13 @@ app.get('/event/:slug', async (req, res) => {
         "url": "https://maltaeventguide.com"
       }
     };
-    if (startDate) {
-      jsonLd.startDate = startDate.toISOString().split('T')[0];
-      // endDate: use end of date range if available, otherwise same as start
-      const endDate = getEndDate(event.event_date);
-      jsonLd.endDate = endDate ? endDate.toISOString().split('T')[0] : jsonLd.startDate;
-    }
     if (hasImg) jsonLd.image = img;
     if (externalUrl) {
       jsonLd.url = externalUrl;
       jsonLd.offers = {
         "@type": "Offer",
         "url": externalUrl,
+        "priceCurrency": "EUR",
         "availability": "https://schema.org/InStock"
       };
     }
@@ -1387,7 +1409,6 @@ app.get('/event/:slug', async (req, res) => {
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="${desc.replace(/"/g, '&quot;')} — ${dateStr} at ${loc}. Find event details on Malta Event Guide.">
   <meta name="robots" content="index, follow">
-  <meta property="article:modified_time" content="${new Date().toISOString()}">
   <link rel="canonical" href="https://maltaeventguide.com/event/${slug}">
 
   <meta property="og:type" content="event">
