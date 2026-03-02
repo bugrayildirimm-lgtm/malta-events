@@ -1378,11 +1378,11 @@ app.get('/event/:slug', async (req, res) => {
     if (externalUrl) {
       jsonLd.url = externalUrl;
       jsonLd.offers = {
-        "@type": "Offer",
-        "url": externalUrl,
-        "priceCurrency": "EUR",
-        "availability": "https://schema.org/InStock"
-      };
+  "@type": "Offer",
+  "url": externalUrl,
+  "priceCurrency": "EUR",
+  "availability": "https://schema.org/InStock"
+};
     }
     if (event.source_name) {
       jsonLd.performer = {
@@ -1518,7 +1518,7 @@ app.get('/event/:slug', async (req, res) => {
         <h1>${title}</h1>
         <div class="info-grid">
           ${dateStr ? '<div class="info-row"><div class="info-icon date">📅</div><div><div class="info-label">' + dateStr + '</div></div></div>' : ''}
-          <div class="info-row"><div class="info-icon loc">📍</div><div><div class="info-label">${loc}</div></div></div>
+          <div class="info-row"><div class="info-icon loc">📍</div><div><div class="info-label"><a href="https://www.google.com/maps/search/${encodeURIComponent(loc + ', Malta')}" target="_blank" rel="noopener" style="color:#1e293b;text-decoration:underline;text-decoration-color:#cbd5e1;text-underline-offset:3px">${loc}</a></div></div></div>
           ${event.category ? '<div class="info-row"><div class="info-icon cat">' + (catEmojis[event.category]||'📌') + '</div><div><div class="info-label">' + event.category + '</div></div></div>' : ''}
           ${event.recurring ? '<div class="info-row"><div class="info-icon recur">🔁</div><div><div class="info-label">' + event.recurring + '</div></div></div>' : ''}
         </div>
