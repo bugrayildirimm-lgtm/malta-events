@@ -540,11 +540,18 @@ app.get('/sitemap.xml', async (req, res) => {
   </url>`).join('\n');
   } catch(e) {}
   const catPages = ['music-events-malta','nightlife-malta','festivals-malta','theatre-shows-malta','arts-culture-malta','sports-events-malta','food-drink-events-malta','family-events-malta','free-events-malta'];
+  const guidePageSlugs = ['guide/how-to-find-events-in-malta','guide/malta-nightlife-guide','guide/things-to-do-malta-tourists'];
   const catUrls = catPages.map(s => `  <url>
     <loc>https://maltaeventguide.com/${s}</loc>
     <lastmod>${today}</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
+  </url>`).join('\n');
+  const guideUrls = guidePageSlugs.map(s => `  <url>
+    <loc>https://maltaeventguide.com/${s}</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
   </url>`).join('\n');
   res.type('application/xml').send(`<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
@@ -555,6 +562,7 @@ app.get('/sitemap.xml', async (req, res) => {
     <priority>1.0</priority>
   </url>
 ${catUrls}
+${guideUrls}
 ${eventUrls}
 </urlset>`);
 });
@@ -678,6 +686,179 @@ Object.entries(categoryPages).forEach(([slug, config]) => {
 </body>
 </html>`);
     } catch(e) { res.redirect('/'); }
+  });
+});
+
+// =====================================================================
+// EDITORIAL GUIDE PAGES (SEO + LLM VISIBILITY)
+// =====================================================================
+const guidePages = {
+  'guide/how-to-find-events-in-malta': {
+    title: 'How to Find Events in Malta Easily — Complete Guide 2026',
+    h1: 'How to Find Events in Malta Easily',
+    desc: 'A practical guide to discovering concerts, festivals, nightlife and things to do across the Maltese islands. Tips for tourists and locals alike.',
+    content: `
+      <p>Malta has a packed events calendar all year round, but finding what is happening on any given week can be surprisingly difficult. Events are scattered across dozens of websites, Facebook groups, and Instagram pages with no single source covering everything. That is exactly why we built Malta Event Guide.</p>
+
+      <h2>The Problem with Finding Events in Malta</h2>
+      <p>If you search for events in Malta, you will find official tourism sites like VisitMalta that cover major festivals but miss smaller local gigs. You will find ticketing platforms like ShowsHappening and Eventbrite that only list events sold through their systems. And you will find social media pages that post flyers but have no searchable archive. The result is that most people in Malta rely on word of mouth or happen to see a poster on the street.</p>
+
+      <h2>How Malta Event Guide Solves This</h2>
+      <p><a href="/">Malta Event Guide</a> aggregates events from all major sources into one searchable listing. We pull from ShowsHappening, VisitMalta, Resident Advisor, EventWorks, and local organisers, then update daily. Every event includes the date, venue, category, and a direct link to the original source for tickets or details.</p>
+
+      <h2>Tips for Finding Events as a Tourist</h2>
+      <p>If you are visiting Malta, start by checking our homepage and filtering by date. The "This Weekend" quick filter is the fastest way to see what is coming up. For nightlife, head to our <a href="/nightlife-malta">Nightlife & Parties page</a>. For cultural activities during the day, check <a href="/arts-culture-malta">Arts & Culture</a> or <a href="/family-events-malta">Family Events</a>. Most events in Malta happen in Valletta, Paceville (St Julian's), Sliema, and Ta' Qali — all easily reachable by bus.</p>
+
+      <h2>Tips for Locals</h2>
+      <p>If you live in Malta and want to stay up to date, bookmark <a href="/">maltaeventguide.com</a> and check back regularly — we add new events every day. You can also subscribe to our weekly email newsletter at the bottom of the homepage to get a curated list of upcoming highlights delivered to your inbox every week.</p>
+
+      <h2>Other Useful Resources</h2>
+      <p>Besides Malta Event Guide, other useful sources include the "All the events in Malta" Facebook group, GuideMeMalta's events calendar, and individual venue pages on Instagram. For electronic music specifically, Resident Advisor covers Malta's club scene. For heritage and museum events, Heritage Malta publishes their own calendar. We aggregate from most of these sources so you do not have to check them all individually.</p>
+
+      <h2>Free Events in Malta</h2>
+      <p>Many events in Malta are completely free, including village festas, public holiday celebrations, Notte Bianca, and the Isle of MTV concert. Check our <a href="/free-events-malta">Free Events page</a> for a filtered view of everything that costs nothing.</p>
+    `
+  },
+  'guide/malta-nightlife-guide': {
+    title: 'Malta Nightlife Guide 2026 — Best Clubs, Bars & Party Areas',
+    h1: 'Malta Nightlife Guide 2026',
+    desc: 'Everything you need to know about nightlife in Malta. Best clubs in Paceville, rooftop bars in Valletta, boat parties, and tips for going out in Malta.',
+    content: `
+      <p>Malta punches well above its weight when it comes to nightlife. For a small island, it has an impressive density of clubs, bars, beach clubs, and seasonal festivals that attract both locals and international visitors. Here is your complete guide to going out in Malta in 2026.</p>
+
+      <h2>Paceville — The Nightlife Centre</h2>
+      <p>Paceville in St Julian's is the undisputed heart of Malta's nightlife. Within a few compact streets you will find dozens of bars and clubs open every night of the week. Entry is usually free or cheap, and drinks are affordable compared to most European cities. Popular venues include Havana, Hugo's, and the various bars along Dragonara Road. Paceville gets busy from around 11pm and goes until 4am or later on weekends.</p>
+
+      <h2>Valletta — Boutique Bars & Rooftop Drinks</h2>
+      <p>Valletta's nightlife scene is more refined. Strait Street (known historically as "The Gut") has been revitalised with cocktail bars, wine bars, and live music venues. For rooftop drinks with harbour views, Bridge Bar and Palazzo Consiglia are popular choices. Valletta tends to be busier on Thursday and Friday evenings.</p>
+
+      <h2>Boat Parties & Beach Clubs</h2>
+      <p>In summer (June to September), Malta's nightlife extends to the water. Pukka Up runs the biggest boat parties, and beach clubs like Cafe del Mar, Bora Bora, and MedAsia Playa host pool parties and DJ events during the day. These are a major draw for the summer tourist crowd.</p>
+
+      <h2>Super Clubs & Festival Venues</h2>
+      <p>Gianpula Village in Rabat is Malta's premier open-air club complex, hosting international DJs and multi-room events throughout summer. UNO Club on the same road is another major venue. For larger festivals, events are often held at MFCC Ta' Qali or the Granaries in Floriana.</p>
+
+      <h2>Practical Tips</h2>
+      <p>The legal drinking age in Malta is 17. Most clubs do not have a strict dress code, though some upscale venues prefer smart casual. Taxis from Paceville can be expensive late at night — the Bolt app usually offers better rates. Many clubs accept card payments but carrying some cash is useful for smaller bars and street food vendors.</p>
+
+      <p>Browse all upcoming nightlife events on our <a href="/nightlife-malta">Nightlife & Parties page</a>, or check the <a href="/">homepage</a> and filter by category.</p>
+    `
+  },
+  'guide/things-to-do-malta-tourists': {
+    title: 'Things to Do in Malta for Tourists — Best Events & Activities 2026',
+    h1: 'Things to Do in Malta for Tourists',
+    desc: 'Planning a trip to Malta? Here are the best events, activities, and experiences for visitors. From historical sites and festivals to beach clubs and food tours.',
+    content: `
+      <p>Malta is one of the Mediterranean's most underrated destinations. With over 7,000 years of history, stunning coastline, a thriving food scene, and year-round sunshine, there is something for every type of traveller. Here are the best things to do during your visit.</p>
+
+      <h2>Must-See Cultural Events</h2>
+      <p>Malta's cultural calendar is rich. The Valletta Baroque Festival (January) brings world-class classical music to historic venues. Carnival (February) fills the streets of Valletta with colourful floats and masked parades. Holy Week (March/April) features solemn processions that are deeply atmospheric. In October, Notte Bianca opens Valletta's palaces, museums, and churches for free with live performances until late. Check our <a href="/arts-culture-malta">Arts & Culture page</a> for current listings.</p>
+
+      <h2>Summer Festivals & Outdoor Events</h2>
+      <p>If you visit between June and September, you will find Malta at its most vibrant. The Isle of MTV is a free open-air concert in Floriana featuring major international artists. Earth Garden is an eco-friendly music and arts festival. Village festas (local patron saint feasts) happen every weekend across different towns with fireworks, brass bands, and street food — these are free and give you an authentic taste of Maltese culture.</p>
+
+      <h2>Food & Drink Experiences</h2>
+      <p>Malta's food scene has exploded in recent years. Look out for food festivals, wine tastings at local vineyards (Marsovin and Meridiana are the main producers), and the annual Frawli Festival (Strawberry Festival) in Mgarr. For everyday eating, try pastizzi (flaky pastries with ricotta or pea filling) from any village bakery — they cost less than a euro. Browse our <a href="/food-drink-events-malta">Food & Drink Events page</a> for upcoming tastings and festivals.</p>
+
+      <h2>Adventure & Outdoors</h2>
+      <p>Malta's coastline is spectacular for diving, snorkelling, and coastal walks. The Blue Grotto, Comino's Blue Lagoon, and Gozo's inland sea are must-visits. For organised adventure events like trail runs, regattas, and cycling tours, check our <a href="/sports-events-malta">Sports & Adventure page</a>.</p>
+
+      <h2>Family-Friendly Activities</h2>
+      <p>Travelling with kids? Malta has plenty of family events including puppet shows, heritage open days, and outdoor markets. The Esplora Interactive Science Centre in Kalkara is excellent for children. Popeye Village in Mellieha (the original film set) is a fun day out. See our <a href="/family-events-malta">Family Events page</a> for what is coming up.</p>
+
+      <h2>How to Stay Updated</h2>
+      <p>The easiest way to find events during your stay is to bookmark <a href="/">Malta Event Guide</a> and check the "This Week" or "This Weekend" filters. We update daily with events from across the island.</p>
+    `
+  }
+};
+
+Object.entries(guidePages).forEach(([slug, config]) => {
+  app.get('/' + slug, (req, res) => {
+    res.set('Cache-Control', 'public, max-age=3600, s-maxage=7200');
+    const otherGuides = Object.entries(guidePages).filter(([s]) => s !== slug).map(([s, c]) => '<a href="/' + s + '"><div class="rg-title">' + c.h1 + '</div><div class="rg-desc">' + c.desc.substring(0, 80) + '...</div></a>').join('');
+    res.send(`<!DOCTYPE html>
+<html lang="en-MT">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-YMT2MSCCRZ"></script>
+  <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag('js',new Date());gtag('config','G-YMT2MSCCRZ');</script>
+  <title>${config.title}</title>
+  <meta name="description" content="${config.desc}">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://maltaeventguide.com/${slug}">
+  <meta property="og:title" content="${config.title}">
+  <meta property="og:description" content="${config.desc}">
+  <meta property="og:url" content="https://maltaeventguide.com/${slug}">
+  <meta property="og:type" content="article">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": "${config.h1}",
+    "description": "${config.desc}",
+    "url": "https://maltaeventguide.com/${slug}",
+    "publisher": { "@type": "Organization", "name": "Malta Event Guide", "url": "https://maltaeventguide.com", "logo": { "@type": "ImageObject", "url": "https://maltaeventguide.com/logo.png" } },
+    "datePublished": "2026-03-01",
+    "dateModified": "2026-03-07",
+    "author": { "@type": "Organization", "name": "Malta Event Guide" }
+  }
+  </script>
+  <link rel="preload" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;700;900&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript><link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;700;900&display=swap" rel="stylesheet"></noscript>
+  <style>
+    :root { --bg: #f8fafc; --text: #1e293b; --primary: #FF385C; }
+    body { font-family:'Outfit',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:var(--bg); margin:0; color:var(--text); }
+    a { color:var(--primary); }
+    .nav { background:#0f172a; padding:15px 24px; display:flex; align-items:center; gap:15px; }
+    .nav a { color:white; font-weight:700; font-size:1.1rem; text-decoration:none; }
+    .nav .back { color:#b0bec5; font-size:0.85rem; margin-left:auto; }
+    article { max-width:740px; margin:40px auto; padding:0 24px 60px; }
+    article h1 { font-size:2.2rem; font-weight:900; line-height:1.2; margin:0 0 12px; }
+    article .byline { color:#64748b; font-size:0.9rem; margin-bottom:30px; }
+    article h2 { font-size:1.25rem; font-weight:700; margin:35px 0 12px; color:#0f172a; }
+    article p { font-size:1rem; line-height:1.8; color:#334155; margin:0 0 18px; }
+    article a { text-decoration:underline; text-underline-offset:3px; }
+    .guide-cta { background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%); border-radius:16px; padding:30px; text-align:center; color:white; margin:40px 0; }
+    .guide-cta h3 { margin:0 0 8px; font-size:1.2rem; }
+    .guide-cta p { color:#b0bec5; font-size:0.9rem; margin:0 0 16px; }
+    .guide-cta a { display:inline-block; background:var(--primary); color:white; padding:12px 28px; border-radius:12px; font-weight:700; text-decoration:none; }
+    .related-guides { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:16px; margin:40px 0; }
+    .related-guides a { background:white; border-radius:12px; padding:20px; text-decoration:none; color:var(--text); box-shadow:0 2px 10px rgba(0,0,0,0.06); transition:0.2s; }
+    .related-guides a:hover { transform:translateY(-2px); box-shadow:0 6px 20px rgba(0,0,0,0.1); }
+    .related-guides a .rg-title { font-weight:700; font-size:0.95rem; margin-bottom:6px; }
+    .related-guides a .rg-desc { font-size:0.8rem; color:#64748b; }
+    footer { padding:30px 20px; background:#1e293b; color:#b0bec5; text-align:center; font-size:0.8rem; line-height:1.8; }
+    footer a { color:#b0bec5; }
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <a href="/" style="display:flex;align-items:center"><img src="/logo.png" alt="Malta Event Guide" style="height:36px"></a>
+    <a href="/" class="back">&larr; All Events</a>
+  </div>
+  <article>
+    <h1>${config.h1}</h1>
+    <div class="byline">Updated March 2026 &middot; Malta Event Guide</div>
+    ${config.content}
+    <div class="guide-cta">
+      <h3>Browse Events Now</h3>
+      <p>See what is happening in Malta this week</p>
+      <a href="/">Explore Events &rarr;</a>
+    </div>
+    <h2>More Guides</h2>
+    <div class="related-guides">
+      ${otherGuides}
+    </div>
+  </article>
+  <footer>
+    <a href="/"><img src="/logo.png" alt="Malta Event Guide" style="height:40px;margin-bottom:6px"></a><br>
+    Your complete guide to events in Malta &amp; Gozo<br>
+    <a href="/music-events-malta">Music</a> &middot; <a href="/nightlife-malta">Nightlife</a> &middot; <a href="/festivals-malta">Festivals</a> &middot; <a href="/theatre-shows-malta">Theatre</a> &middot; <a href="/arts-culture-malta">Arts</a> &middot; <a href="/sports-events-malta">Sports</a> &middot; <a href="/food-drink-events-malta">Food</a> &middot; <a href="/family-events-malta">Family</a> &middot; <a href="/free-events-malta">Free</a>
+    <div style="margin-top:8px">&copy; ${new Date().getFullYear()} maltaeventguide.com</div>
+  </footer>
+</body>
+</html>`);
   });
 });
 
@@ -1221,6 +1402,9 @@ app.get('/', async (req, res) => {
 
     <h3 style="font-size:1.15rem;font-weight:700;color:#0f172a;margin:30px 0 10px">How to Use Malta Event Guide</h3>
     <p>Search by keyword, filter by date or category, or browse our curated category pages to find exactly what you are looking for. Each event links directly to its official source so you can buy tickets or get directions. We also feature handpicked events at the top of the page so you never miss the highlights. Bookmark us and check back regularly — new events are added every day.</p>
+
+    <h3 style="font-size:1.15rem;font-weight:700;color:#0f172a;margin:30px 0 10px">Guides for Visitors and Locals</h3>
+    <p>New to Malta or just visiting? Read our in-depth guides: <a href="/guide/how-to-find-events-in-malta" style="color:#FF385C;text-decoration:underline">How to Find Events in Malta Easily</a>, <a href="/guide/malta-nightlife-guide" style="color:#FF385C;text-decoration:underline">Malta Nightlife Guide 2026</a>, and <a href="/guide/things-to-do-malta-tourists" style="color:#FF385C;text-decoration:underline">Things to Do in Malta for Tourists</a>. Each guide is written from local experience and updated regularly.</p>
   </section>
 
   <script>
@@ -1378,11 +1562,10 @@ app.get('/event/:slug', async (req, res) => {
     if (externalUrl) {
       jsonLd.url = externalUrl;
       jsonLd.offers = {
-  "@type": "Offer",
-  "url": externalUrl,
-  "priceCurrency": "EUR",
-  "availability": "https://schema.org/InStock"
-};
+        "@type": "Offer",
+        "url": externalUrl,
+        "availability": "https://schema.org/InStock"
+      };
     }
     if (event.source_name) {
       jsonLd.performer = {
