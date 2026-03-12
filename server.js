@@ -2105,7 +2105,10 @@ app.get('/admin', (req, res) => {
         <div style="flex:1;min-width:300px">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px">
             <h3 style="color:white;margin:0">📝 Draft Events</h3>
-            <button onclick="loadDrafts()" style="padding:6px 14px;border-radius:8px;border:1px solid #334155;background:transparent;color:#94a3b8;font-family:inherit;cursor:pointer;font-size:0.8rem">↻ Refresh</button>
+            <div style="display:flex;gap:8px">
+              <button onclick="deleteAllDrafts()" style="padding:6px 14px;border-radius:8px;border:1px solid #ef4444;background:transparent;color:#ef4444;font-family:inherit;cursor:pointer;font-size:0.8rem;font-weight:600">🗑️ Delete All Drafts</button>
+              <button onclick="loadDrafts()" style="padding:6px 14px;border-radius:8px;border:1px solid #334155;background:transparent;color:#94a3b8;font-family:inherit;cursor:pointer;font-size:0.8rem">↻ Refresh</button>
+            </div>
           </div>
           <div id="draftList" style="max-height:600px;overflow-y:auto">
             <div style="color:#64748b;font-size:0.85rem;padding:20px;text-align:center">Switch to this tab to load drafts</div>
@@ -2753,6 +2756,16 @@ function xlImport(){
   .catch(function(){toast('Import failed',1)});
 }
 
+function deleteAllDrafts(){
+  var count=document.querySelectorAll('#draftList .draft-row').length||'all';
+  if(!confirm('Delete '+count+' draft events? This cannot be undone.'))return;
+  fetch('/admin/api/drafts/delete-all',{method:'DELETE',headers:{Authorization:auth}})
+    .then(function(r){return r.json()})
+    .then(function(d){
+      if(d.ok){toast(d.deleted+' drafts deleted');loadDrafts();loadStats();}
+      else toast('Error: '+(d.error||'unknown'),1);
+    }).catch(function(){toast('Failed to delete drafts',1)});
+}
 function loadDrafts(){
   fetch('/admin/api/drafts',{headers:{Authorization:auth}})
     .then(function(r){return r.json()})
@@ -3558,6 +3571,16 @@ app.get('/admin/api/drafts', async (req, res) => {
     res.json(result.rows);
   } catch (e) {
     res.json([]);
+  }
+});
+
+app.delete('/admin/api/drafts/delete-all', async (req, res) => {
+  if (!authCheck(req, res)) return;
+  try {
+    const result = await pool.query("DELETE FROM events WHERE status = 'draft'");
+    res.json({ ok: true, deleted: result.rowCount });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
   }
 });
 
