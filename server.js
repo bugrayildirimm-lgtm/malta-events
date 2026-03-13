@@ -3887,4 +3887,45 @@ app.get('/admin/api/subscribers', async (req, res) => {
   } catch (e) { res.json([]); }
 });
 
+// =====================================================================
+// AUTO-CLEANUP: Delete past events daily
+// =====================================================================
+async function cleanupPastEvents() {
+  try {
+    const result = await pool.query("SELECT id, title, event_date, recurring FROM events WHERE COALESCE(status, 'live') = 'live'");
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    // Give 1 day grace period after event ends
+    const cutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const toDelete = [];
+    
+    for (const event of result.rows) {
+      // Skip recurring events — they repeat
+      if (event.recurring) continue;
+      // Skip events with no parseable date
+      const endDate = getEndDate(event.event_date);
+      const startDate = getStartDate(event.event_date);
+      const eventEnd = endDate || startDate;
+      if (!eventEnd) continue;
+      // If event ended before cutoff, mark for deletion
+      if (eventEnd < cutoff) {
+        toDelete.push(event.id);
+      }
+    }
+    
+    if (toDelete.length > 0) {
+      await pool.query('DELETE FROM events WHERE id = ANY($1)', [toDelete]);
+      console.log(`[Cleanup] Deleted ${toDelete.length} past events`);
+    } else {
+      console.log('[Cleanup] No past events to delete');
+    }
+  } catch (e) {
+    console.log('[Cleanup] Error:', e.message);
+  }
+}
+
+// Run on server start (after 30 seconds) and then every 24 hours
+setTimeout(cleanupPastEvents, 30000);
+setInterval(cleanupPastEvents, 24 * 60 * 60 * 1000);
+
 app.listen(3000, () => console.log('Server running at http://localhost:3000'));
