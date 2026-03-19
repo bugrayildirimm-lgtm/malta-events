@@ -1657,6 +1657,8 @@ app.get('/event/:slug', async (req, res) => {
     .info-label { font-weight:600; color:var(--text); }
 
     .desc { color:#475569; line-height:1.8; font-size:0.95rem; margin:15px 0; flex-grow:1; }
+    .desc p { margin:0 0 14px; }
+    .desc p:last-child { margin-bottom:0; }
 
     .cta { display:block; width:100%; padding:16px; background:#0f172a; color:white; text-align:center; border-radius:12px; font-weight:800; font-size:1.05rem; transition:0.3s; box-sizing:border-box; }
     .cta:hover { background:var(--primary); transform:translateY(-2px); box-shadow:0 8px 25px rgba(255,56,92,0.3); }
@@ -1718,7 +1720,7 @@ app.get('/event/:slug', async (req, res) => {
           ${event.category ? '<div class="info-row"><div class="info-icon cat">' + (catEmojis[event.category]||'📌') + '</div><div><div class="info-label">' + event.category + '</div></div></div>' : ''}
           ${event.recurring ? '<div class="info-row"><div class="info-icon recur">🔁</div><div><div class="info-label">' + event.recurring + '</div></div></div>' : ''}
         </div>
-        ${event.description ? '<div class="desc">' + event.description + '</div>' : ''}
+        ${event.description ? '<div class="desc">' + event.description.replace(/\n\n+/g, '</p><p>').replace(/\n/g, '<br>').replace(/^/, '<p>').replace(/$/, '</p>') + '</div>' : ''}
         ${externalUrl ? '<a href="' + externalUrl + '" target="_blank" class="cta" onclick="fetch(\'/api/track\',{method:\'POST\',headers:{\'Content-Type\':\'application/json\'},body:JSON.stringify({event_id:' + event.id + ',event_title:\'' + title.replace(/'/g, "\\'") + '\',source:\'' + source + '\'})})">View Event / Get Tickets →</a>' : '<a href="/" class="cta">← Browse More Events</a>'}
         <div class="share-row">
           <div class="share-btn share-whatsapp" onclick="window.open('https://wa.me/?text='+encodeURIComponent('${title.replace(/'/g, "\\'")} - https://maltaeventguide.com/event/${slug}'))">WhatsApp</div>
