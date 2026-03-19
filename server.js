@@ -1638,11 +1638,11 @@ app.get('/event/:slug', async (req, res) => {
 
     .wrapper { max-width:960px; margin:30px auto; padding:0 20px 40px; }
 
-    .event-layout { display:flex; flex-direction:column; background:white; border-radius:20px; overflow:hidden; box-shadow:0 4px 24px rgba(0,0,0,0.08); }
+    .event-layout { display:grid; grid-template-columns:400px 1fr; gap:0; background:white; border-radius:20px; overflow:hidden; box-shadow:0 4px 24px rgba(0,0,0,0.08); }
 
-    .event-img { background:#0f172a; overflow:hidden; }
-    .event-img img { width:100%; display:block; max-height:500px; object-fit:contain; }
-    .event-img .fallback { height:200px;display:flex;align-items:center;justify-content:center;color:white;font-size:6rem;font-weight:800;background:#1e293b; }
+    .event-img { background:#0f172a; display:flex; align-items:flex-start; justify-content:center; min-height:400px; }
+    .event-img img { width:100%; height:100%; object-fit:cover; }
+    .event-img .fallback { width:100%;min-height:400px;display:flex;align-items:center;justify-content:center;color:white;font-size:6rem;font-weight:800;background:#1e293b; }
 
     .event-details { padding:32px; display:flex; flex-direction:column; }
 
@@ -1688,7 +1688,9 @@ app.get('/event/:slug', async (req, res) => {
     .footer a { color:#94a3b8; }
 
     @media (max-width:750px) {
-      .event-img img { max-height:300px; }
+      .event-layout { grid-template-columns:1fr; }
+      .event-img { min-height:auto; max-height:400px; overflow:hidden; }
+      .event-img img { max-height:400px; object-fit:contain; }
       .event-details { padding:24px; }
       h1 { font-size:1.4rem; }
       .wrapper { margin-top:15px; }
