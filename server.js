@@ -1669,6 +1669,7 @@ app.get('/event/:slug', async (req, res) => {
     .share-whatsapp { background:#25D366; }
     .share-facebook { background:#1877F2; }
     .share-copy { background:#64748b; }
+    .share-calendar { background:#0f172a; }
 
     .related { max-width:960px; margin:40px auto; padding:0 20px; }
     .related h2 { font-size:1.2rem; margin-bottom:15px; }
@@ -1723,10 +1724,45 @@ app.get('/event/:slug', async (req, res) => {
         ${event.description ? '<div class="desc">' + event.description.replace(/\n\n+/g, '</p><p>').replace(/\n/g, '<br>').replace(/^/, '<p>').replace(/$/, '</p>') + '</div>' : ''}
         ${externalUrl ? '<a href="' + externalUrl + '" target="_blank" class="cta" onclick="fetch(\'/api/track\',{method:\'POST\',headers:{\'Content-Type\':\'application/json\'},body:JSON.stringify({event_id:' + event.id + ',event_title:\'' + title.replace(/'/g, "\\'") + '\',source:\'' + source + '\'})})">View Event / Get Tickets →</a>' : '<a href="/" class="cta">← Browse More Events</a>'}
         <div class="share-row">
+          <div class="share-btn share-calendar" onclick="addToCalendar()">📅 Add to Calendar</div>
           <div class="share-btn share-whatsapp" onclick="window.open('https://wa.me/?text='+encodeURIComponent('${title.replace(/'/g, "\\'")} - https://maltaeventguide.com/event/${slug}'))">WhatsApp</div>
           <div class="share-btn share-facebook" onclick="window.open('https://www.facebook.com/sharer/sharer.php?u='+encodeURIComponent('https://maltaeventguide.com/event/${slug}'))">Facebook</div>
           <div class="share-btn share-copy" onclick="navigator.clipboard.writeText('https://maltaeventguide.com/event/${slug}');this.textContent='Copied!'">Copy Link</div>
         </div>
+        <script>
+        function addToCalendar(){
+          var title=${JSON.stringify(title)};
+          var loc=${JSON.stringify(loc)};
+          var desc=${JSON.stringify((event.description||'').substring(0,300).replace(/\n/g,' '))}+'\\n\\nhttps://maltaeventguide.com/event/${slug}';
+          var startDate=${startDate ? JSON.stringify(startDate.toISOString().split('T')[0].replace(/-/g,'')) : '"'+ new Date().toISOString().split('T')[0].replace(/-/g,'') +'"'};
+          var endDate=${endDate ? JSON.stringify(endDate.toISOString().split('T')[0].replace(/-/g,'')) : 'startDate'};
+          // Make end date the next day if same as start (all-day event)
+          if(endDate===startDate){
+            var d=new Date(startDate.substring(0,4)+'-'+startDate.substring(4,6)+'-'+startDate.substring(6,8));
+            d.setDate(d.getDate()+1);
+            endDate=d.toISOString().split('T')[0].replace(/-/g,'');
+          }
+          var ics=[
+            'BEGIN:VCALENDAR',
+            'VERSION:2.0',
+            'PRODID:-//Malta Event Guide//EN',
+            'BEGIN:VEVENT',
+            'DTSTART;VALUE=DATE:'+startDate,
+            'DTEND;VALUE=DATE:'+endDate,
+            'SUMMARY:'+title.replace(/[,;]/g,' '),
+            'LOCATION:'+loc.replace(/[,;]/g,' ')+', Malta',
+            'DESCRIPTION:'+desc.replace(/[,;\\n]/g,' ').substring(0,200),
+            'URL:https://maltaeventguide.com/event/${slug}',
+            'END:VEVENT',
+            'END:VCALENDAR'
+          ].join('\\r\\n');
+          var blob=new Blob([ics],{type:'text/calendar;charset=utf-8'});
+          var link=document.createElement('a');
+          link.href=URL.createObjectURL(blob);
+          link.download=title.replace(/[^a-zA-Z0-9]/g,'-').substring(0,40)+'.ics';
+          link.click();
+        }
+        </script>
       </div>
     </div>
   </div>
