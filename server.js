@@ -1209,15 +1209,17 @@ app.get('/', async (req, res) => {
     if (featured.length === 0) return '';
     const fCount = featured.length;
     const gridCols = fCount === 1 ? 'grid-template-columns:1fr' : fCount === 2 ? 'grid-template-columns:repeat(2,1fr)' : 'grid-template-columns:repeat(auto-fill,minmax(300px,1fr))';
+    const maxW = fCount === 1 ? '420' : fCount <= 2 ? '800' : '1400';
+    const imgH = fCount === 1 ? '320' : '180';
     return `
-    <div style="max-width:${fCount <= 2 ? '800' : '1400'}px;margin:0 auto;padding:0 20px 20px">
+    <div style="max-width:${maxW}px;margin:0 auto;padding:0 20px 20px">
       <h2 style="font-size:1.3rem;font-weight:800;margin:0 0 15px;color:#1e293b">⭐ Featured Events</h2>
       <div style="display:grid;${gridCols};gap:16px">
         ${featured.map(e => {
           const slug = e.slug || generateSlug(e.title);
           const img = e.image_url && e.image_url.startsWith('http') ? e.image_url : '';
           return `<a href="/event/${slug}" style="text-decoration:none;display:block;background:white;border-radius:16px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);border:2px solid #fbbf24;transition:0.2s" onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 8px 25px rgba(0,0,0,0.12)'" onmouseout="this.style.transform='';this.style.boxShadow='0 2px 12px rgba(0,0,0,0.08)'">
-            ${img ? `<div style="height:180px;overflow:hidden"><img src="${img}" alt="${(e.title||'').replace(/"/g,'&quot;')} — event in Malta" loading="lazy" width="400" height="180" style="width:100%;height:100%;object-fit:cover"></div>` : ''}
+            ${img ? `<div style="height:${imgH}px;overflow:hidden"><img src="${img}" alt="${(e.title||'').replace(/"/g,'&quot;')} — event in Malta" loading="lazy" width="400" height="${imgH}" style="width:100%;height:100%;object-fit:cover"></div>` : ''}
             <div style="padding:14px">
               <div style="font-size:0.7rem;font-weight:700;color:#f59e0b;text-transform:uppercase;margin-bottom:4px">⭐ Featured</div>
               <div style="font-size:1rem;font-weight:700;color:#0f172a">${e.title}</div>
@@ -1638,9 +1640,9 @@ app.get('/event/:slug', async (req, res) => {
 
     .event-layout { display:grid; grid-template-columns:360px 1fr; gap:0; background:white; border-radius:20px; overflow:hidden; box-shadow:0 4px 24px rgba(0,0,0,0.08); align-items:start; }
 
-    .event-img { position:relative; background:#f1f5f9; overflow:hidden; min-height:300px; max-height:500px; border-radius:20px 0 0 0; }
-    .event-img img { width:100%; height:100%; object-fit:cover; object-position:center; position:absolute; top:0; left:0; }
-    .event-img .fallback { width:100%;height:100%;min-height:400px;display:flex;align-items:center;justify-content:center;color:white;font-size:6rem;font-weight:800;background:#1e293b;position:absolute;top:0;left:0; }
+    .event-img { position:relative; background:#0f172a; overflow:hidden; border-radius:20px 0 0 0; }
+    .event-img img { width:100%; display:block; object-fit:contain; max-height:600px; }
+    .event-img .fallback { min-height:400px;display:flex;align-items:center;justify-content:center;color:white;font-size:6rem;font-weight:800;background:#1e293b; }
 
     .event-details { padding:32px; display:flex; flex-direction:column; }
 
@@ -1687,8 +1689,7 @@ app.get('/event/:slug', async (req, res) => {
 
     @media (max-width:750px) {
       .event-layout { grid-template-columns:1fr; }
-      .event-img { min-height:220px; max-height:350px; }
-      .event-img img { object-fit:cover; }
+      .event-img img { max-height:350px; }
       .event-details { padding:24px; }
       h1 { font-size:1.4rem; }
       .wrapper { margin-top:15px; }
@@ -1709,8 +1710,8 @@ app.get('/event/:slug', async (req, res) => {
   <div class="wrapper">
     <div class="event-layout">
       <div class="event-img">
-        ${hasImg ? '<img src="' + img + '" alt="' + title.replace(/"/g, '&quot;') + ' event in ' + loc.replace(/"/g, '&quot;') + ', Malta" onerror="this.style.display=\'none\'">' : ''}
-        <div class="fallback" style="background:${bgStyle};${hasImg ? 'z-index:-1;' : ''}">${firstLetter}</div>
+        ${hasImg ? '<img src="' + img + '" alt="' + title.replace(/"/g, '&quot;') + ' event in ' + loc.replace(/"/g, '&quot;') + ', Malta" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">' : ''}
+        <div class="fallback" style="background:${bgStyle};${hasImg ? 'display:none;' : ''}">${firstLetter}</div>
       </div>
       <div class="event-details">
         <div class="source-badge">${source}</div>
