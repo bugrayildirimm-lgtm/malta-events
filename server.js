@@ -1742,7 +1742,7 @@ app.get('/event/:slug', async (req, res) => {
           + '</div>' : ''}
         ${externalUrl ? '<a href="' + externalUrl + '" target="_blank" class="cta" onclick="fetch(\'/api/track\',{method:\'POST\',headers:{\'Content-Type\':\'application/json\'},body:JSON.stringify({event_id:' + event.id + ',event_title:\'' + title.replace(/'/g, "\\'") + '\',source:\'' + source + '\'})})">View Event / Get Tickets →</a>' : '<a href="/" class="cta">← Browse More Events</a>'}
         <div class="share-row">
-          <div class="share-btn share-calendar" onclick="addToCalendar()">📅 Add to Calendar</div>
+          <div class="share-btn share-calendar" onclick="addToCalendar()">Add to Calendar</div>
           <div class="share-btn share-whatsapp" onclick="window.open('https://wa.me/?text='+encodeURIComponent('${title.replace(/'/g, "\\'")} - https://maltaeventguide.com/event/${slug}'))">WhatsApp</div>
           <div class="share-btn share-facebook" onclick="window.open('https://www.facebook.com/sharer/sharer.php?u='+encodeURIComponent('https://maltaeventguide.com/event/${slug}'))">Facebook</div>
           <div class="share-btn share-copy" onclick="navigator.clipboard.writeText('https://maltaeventguide.com/event/${slug}');this.textContent='Copied!'">Copy Link</div>
