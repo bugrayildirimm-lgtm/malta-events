@@ -1208,24 +1208,23 @@ app.get('/', async (req, res) => {
     const featured = allEvents.filter(e => e.featured);
     if (featured.length === 0) return '';
     const fCount = featured.length;
-    const gridCols = fCount === 1 ? 'grid-template-columns:1fr' : fCount === 2 ? 'grid-template-columns:repeat(2,1fr)' : 'grid-template-columns:repeat(auto-fill,minmax(300px,1fr))';
-    const maxW = fCount === 1 ? '420' : fCount <= 2 ? '800' : '1400';
-    const imgH = fCount === 1 ? '320' : '180';
     return `
-    <div style="max-width:${maxW}px;margin:0 auto;padding:0 20px 20px">
+    <div style="max-width:${fCount === 1 ? '500' : fCount === 2 ? '900' : '1400'}px;margin:0 auto;padding:0 20px 25px">
       <h2 style="font-size:1.3rem;font-weight:800;margin:0 0 15px;color:#1e293b">⭐ Featured Events</h2>
-      <div style="display:grid;${gridCols};gap:16px">
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(${fCount === 1 ? '300' : '280'}px,1fr));gap:20px">
         ${featured.map(e => {
           const slug = e.slug || generateSlug(e.title);
           const img = e.image_url && e.image_url.startsWith('http') ? e.image_url : '';
-          return `<a href="/event/${slug}" style="text-decoration:none;display:block;background:white;border-radius:16px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);border:2px solid #fbbf24;transition:0.2s" onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 8px 25px rgba(0,0,0,0.12)'" onmouseout="this.style.transform='';this.style.boxShadow='0 2px 12px rgba(0,0,0,0.08)'">
-            ${img ? `<div style="height:${imgH}px;overflow:hidden"><img src="${img}" alt="${(e.title||'').replace(/"/g,'&quot;')} — event in Malta" loading="lazy" width="400" height="${imgH}" style="width:100%;height:100%;object-fit:cover"></div>` : ''}
-            <div style="padding:14px">
-              <div style="font-size:0.7rem;font-weight:700;color:#f59e0b;text-transform:uppercase;margin-bottom:4px">⭐ Featured</div>
-              <div style="font-size:1rem;font-weight:700;color:#0f172a">${e.title}</div>
-              <div style="font-size:0.8rem;color:#64748b;margin-top:4px">${e.event_date || ''} · ${e.location || 'Malta'}</div>
-            </div>
-          </a>`;
+          const catEmoji = {'Music & Concerts':'🎵','Theatre & Shows':'🎭','Dance':'💃','Nightlife & Parties':'🎉','Festivals':'🎪','Arts & Culture':'🎨','Sports & Adventure':'🏃','Food & Drink':'🍷','Family':'👨‍👩‍👧','Religious':'⛪','Conference':'📋','Other':'📌'}[e.category] || '📌';
+          const imgHtml = img ? '<div style="background:#0f172a;display:flex;align-items:center;justify-content:center"><img src="' + img + '" alt="' + (e.title||'').replace(/"/g,'&quot;') + ' — event in Malta" loading="lazy" style="width:100%;display:block;max-height:400px;object-fit:contain"></div>' : '<div style="height:120px;background:linear-gradient(135deg,#0f172a,#1e3a5f);display:flex;align-items:center;justify-content:center;font-size:3rem">' + catEmoji + '</div>';
+          return '<a href="/event/' + slug + '" style="text-decoration:none;display:block;background:white;border-radius:20px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08);border:2px solid #fbbf24;transition:all 0.3s" onmouseover="this.style.transform=\'translateY(-4px)\';this.style.boxShadow=\'0 12px 35px rgba(251,191,36,0.2)\'" onmouseout="this.style.transform=\'\';this.style.boxShadow=\'0 4px 20px rgba(0,0,0,0.08)\'">'
+            + imgHtml
+            + '<div style="padding:16px 18px 18px">'
+            + '<div style="display:inline-block;background:linear-gradient(135deg,#f59e0b,#d97706);color:white;padding:3px 10px;border-radius:20px;font-size:0.65rem;font-weight:800;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">⭐ Featured</div>'
+            + '<div style="font-size:1.1rem;font-weight:800;color:#0f172a;line-height:1.3;margin-bottom:6px">' + (e.title||'') + '</div>'
+            + '<div style="display:flex;align-items:center;gap:6px;font-size:0.82rem;color:#64748b;margin-bottom:3px"><span style="font-size:0.9rem">📅</span> ' + (e.event_date || 'TBA') + '</div>'
+            + '<div style="display:flex;align-items:center;gap:6px;font-size:0.82rem;color:#64748b"><span style="font-size:0.9rem">📍</span> ' + (e.location || 'Malta') + '</div>'
+            + '</div></a>';
         }).join('')}
       </div>
     </div>`;
@@ -1638,11 +1637,11 @@ app.get('/event/:slug', async (req, res) => {
 
     .wrapper { max-width:960px; margin:30px auto; padding:0 20px 40px; }
 
-    .event-layout { display:grid; grid-template-columns:400px 1fr; gap:0; background:white; border-radius:20px; overflow:hidden; box-shadow:0 4px 24px rgba(0,0,0,0.08); }
+    .event-layout { display:grid; grid-template-columns:420px 1fr; gap:0; background:white; border-radius:20px; overflow:hidden; box-shadow:0 4px 24px rgba(0,0,0,0.08); }
 
-    .event-img { background:#0f172a; display:flex; align-items:flex-start; justify-content:center; min-height:400px; }
-    .event-img img { width:100%; height:100%; object-fit:cover; }
-    .event-img .fallback { width:100%;min-height:400px;display:flex;align-items:center;justify-content:center;color:white;font-size:6rem;font-weight:800;background:#1e293b; }
+    .event-img { background:#0f172a; display:flex; align-items:flex-start; justify-content:center; overflow:hidden; }
+    .event-img img { width:100%; display:block; object-fit:contain; max-height:700px; }
+    .event-img .fallback { width:100%;min-height:350px;display:flex;align-items:center;justify-content:center;color:white;font-size:6rem;font-weight:800;background:#1e293b; }
 
     .event-details { padding:32px; display:flex; flex-direction:column; }
 
@@ -1661,6 +1660,8 @@ app.get('/event/:slug', async (req, res) => {
     .desc { color:#475569; line-height:1.8; font-size:0.95rem; margin:15px 0; flex-grow:1; }
     .desc p { margin:0 0 14px; }
     .desc p:last-child { margin-bottom:0; }
+    .video-embed { position:relative; padding-bottom:56.25%; height:0; margin:18px 0; border-radius:12px; overflow:hidden; background:#000; }
+    .video-embed iframe { position:absolute; top:0; left:0; width:100%; height:100%; border:0; }
 
     .cta { display:block; width:100%; padding:16px; background:#0f172a; color:white; text-align:center; border-radius:12px; font-weight:800; font-size:1.05rem; transition:0.3s; box-sizing:border-box; }
     .cta:hover { background:var(--primary); transform:translateY(-2px); box-shadow:0 8px 25px rgba(255,56,92,0.3); }
@@ -1689,12 +1690,12 @@ app.get('/event/:slug', async (req, res) => {
 
     @media (max-width:750px) {
       .event-layout { grid-template-columns:1fr; }
-      .event-img { min-height:auto; max-height:400px; overflow:hidden; }
-      .event-img img { max-height:400px; object-fit:contain; }
+      .event-img img { max-height:450px; }
       .event-details { padding:24px; }
       h1 { font-size:1.4rem; }
       .wrapper { margin-top:15px; }
       .share-row { flex-wrap:wrap; }
+      .share-btn { min-width:calc(50% - 6px); }
     }
   </style>
 </head>
@@ -1725,12 +1726,12 @@ app.get('/event/:slug', async (req, res) => {
           ${event.recurring ? '<div class="info-row"><div class="info-icon recur">🔁</div><div><div class="info-label">' + event.recurring + '</div></div></div>' : ''}
         </div>
         ${event.description ? '<div class="desc">' + event.description
-          // Convert YouTube links to embeds
-          .replace(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]{11})(?:[^\s]*)/g, '</p><div style="position:relative;padding-bottom:56.25%;height:0;margin:16px 0;border-radius:12px;overflow:hidden"><iframe src="https://www.youtube.com/embed/$1" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" allowfullscreen loading="lazy"></iframe></div><p>')
-          // Convert Vimeo links to embeds
-          .replace(/(?:https?:\/\/)?(?:www\.)?vimeo\.com\/(\d+)(?:[^\s]*)/g, '</p><div style="position:relative;padding-bottom:56.25%;height:0;margin:16px 0;border-radius:12px;overflow:hidden"><iframe src="https://player.vimeo.com/video/$1" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" allowfullscreen loading="lazy"></iframe></div><p>')
-          // Convert plain URLs to clickable links (but not ones already converted)
-          .replace(/(?<!src="|href=")(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener" style="color:#FF385C;word-break:break-all">$1</a>')
+          // Convert YouTube links to embeds (watch, youtu.be, shorts, embed)
+          .replace(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{11})(?:[^\s]*)/g, '</p><div class="video-embed"><iframe src="https://www.youtube.com/embed/$1?rel=0" allowfullscreen loading="lazy"></iframe></div><p>')
+          // Convert Vimeo links to embeds (vimeo.com/ID, vimeo.com/manage/videos/ID, vimeo.com/channels/xxx/ID, player.vimeo.com/video/ID)
+          .replace(/(?:https?:\/\/)?(?:www\.)?(?:player\.)?vimeo\.com\/(?:manage\/videos\/|channels\/[\w]+\/|video\/)?(\d{6,})(?:[^\s]*)/g, '</p><div class="video-embed"><iframe src="https://player.vimeo.com/video/$1" allowfullscreen loading="lazy"></iframe></div><p>')
+          // Convert plain URLs to clickable links (skip already converted ones)
+          .replace(/(?<!src="|href="|")(https?:\/\/[^\s<"]+)/g, '<a href="$1" target="_blank" rel="noopener" style="color:#FF385C;word-break:break-all">$1</a>')
           // Paragraphs and line breaks
           .replace(/\n\n+/g, '</p><p>').replace(/\n/g, '<br>').replace(/^/, '<p>').replace(/$/, '</p>')
           // Clean up empty paragraphs
@@ -1738,7 +1739,7 @@ app.get('/event/:slug', async (req, res) => {
           + '</div>' : ''}
         ${externalUrl ? '<a href="' + externalUrl + '" target="_blank" class="cta" onclick="fetch(\'/api/track\',{method:\'POST\',headers:{\'Content-Type\':\'application/json\'},body:JSON.stringify({event_id:' + event.id + ',event_title:\'' + title.replace(/'/g, "\\'") + '\',source:\'' + source + '\'})})">View Event / Get Tickets →</a>' : '<a href="/" class="cta">← Browse More Events</a>'}
         <div class="share-row">
-          <div class="share-btn share-calendar" onclick="addToCalendar()">📅 Add to Calendar</div>
+          <div class="share-btn share-calendar" onclick="addToCalendar()"> Add to Calendar</div>
           <div class="share-btn share-whatsapp" onclick="window.open('https://wa.me/?text='+encodeURIComponent('${title.replace(/'/g, "\\'")} - https://maltaeventguide.com/event/${slug}'))">WhatsApp</div>
           <div class="share-btn share-facebook" onclick="window.open('https://www.facebook.com/sharer/sharer.php?u='+encodeURIComponent('https://maltaeventguide.com/event/${slug}'))">Facebook</div>
           <div class="share-btn share-copy" onclick="navigator.clipboard.writeText('https://maltaeventguide.com/event/${slug}');this.textContent='Copied!'">Copy Link</div>
