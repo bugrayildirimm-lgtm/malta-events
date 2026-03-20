@@ -1216,7 +1216,7 @@ app.get('/', async (req, res) => {
           const slug = e.slug || generateSlug(e.title);
           const img = e.image_url && e.image_url.startsWith('http') ? e.image_url : '';
           const catEmoji = {'Music & Concerts':'🎵','Theatre & Shows':'🎭','Dance':'💃','Nightlife & Parties':'🎉','Festivals':'🎪','Arts & Culture':'🎨','Sports & Adventure':'🏃','Food & Drink':'🍷','Family':'👨‍👩‍👧','Religious':'⛪','Conference':'📋','Other':'📌'}[e.category] || '📌';
-          const imgHtml = img ? '<div style="background:#0f172a;display:flex;align-items:center;justify-content:center"><img src="' + img + '" alt="' + (e.title||'').replace(/"/g,'&quot;') + ' — event in Malta" loading="lazy" style="width:100%;display:block;max-height:400px;object-fit:contain"></div>' : '<div style="height:120px;background:linear-gradient(135deg,#0f172a,#1e3a5f);display:flex;align-items:center;justify-content:center;font-size:3rem">' + catEmoji + '</div>';
+          const imgHtml = img ? '<div style="background:white;display:flex;align-items:center;justify-content:center;overflow:hidden"><img src="' + img + '" alt="' + (e.title||'').replace(/"/g,'&quot;') + ' — event in Malta" loading="lazy" style="width:100%;display:block;object-fit:cover;height:280px"></div>' : '<div style="height:120px;background:linear-gradient(135deg,#0f172a,#1e3a5f);display:flex;align-items:center;justify-content:center;font-size:3rem">' + catEmoji + '</div>';
           return '<a href="/event/' + slug + '" style="text-decoration:none;display:block;background:white;border-radius:20px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08);border:2px solid #fbbf24;transition:all 0.3s" onmouseover="this.style.transform=\'translateY(-4px)\';this.style.boxShadow=\'0 12px 35px rgba(251,191,36,0.2)\'" onmouseout="this.style.transform=\'\';this.style.boxShadow=\'0 4px 20px rgba(0,0,0,0.08)\'">'
             + imgHtml
             + '<div style="padding:16px 18px 18px">'
@@ -1639,8 +1639,8 @@ app.get('/event/:slug', async (req, res) => {
 
     .event-layout { display:grid; grid-template-columns:420px 1fr; gap:0; background:white; border-radius:20px; overflow:hidden; box-shadow:0 4px 24px rgba(0,0,0,0.08); }
 
-    .event-img { background:#0f172a; display:flex; align-items:flex-start; justify-content:center; overflow:hidden; }
-    .event-img img { width:100%; display:block; object-fit:contain; max-height:700px; }
+    .event-img { background:white; display:flex; align-items:flex-start; justify-content:center; overflow:hidden; }
+    .event-img img { width:100%; display:block; object-fit:cover; min-height:300px; max-height:600px; }
     .event-img .fallback { width:100%;min-height:350px;display:flex;align-items:center;justify-content:center;color:white;font-size:6rem;font-weight:800;background:#1e293b; }
 
     .event-details { padding:32px; display:flex; flex-direction:column; }
@@ -1739,7 +1739,7 @@ app.get('/event/:slug', async (req, res) => {
           + '</div>' : ''}
         ${externalUrl ? '<a href="' + externalUrl + '" target="_blank" class="cta" onclick="fetch(\'/api/track\',{method:\'POST\',headers:{\'Content-Type\':\'application/json\'},body:JSON.stringify({event_id:' + event.id + ',event_title:\'' + title.replace(/'/g, "\\'") + '\',source:\'' + source + '\'})})">View Event / Get Tickets →</a>' : '<a href="/" class="cta">← Browse More Events</a>'}
         <div class="share-row">
-          <div class="share-btn share-calendar" onclick="addToCalendar()"> Add to Calendar</div>
+          <div class="share-btn share-calendar" onclick="addToCalendar()">📅 Add to Calendar</div>
           <div class="share-btn share-whatsapp" onclick="window.open('https://wa.me/?text='+encodeURIComponent('${title.replace(/'/g, "\\'")} - https://maltaeventguide.com/event/${slug}'))">WhatsApp</div>
           <div class="share-btn share-facebook" onclick="window.open('https://www.facebook.com/sharer/sharer.php?u='+encodeURIComponent('https://maltaeventguide.com/event/${slug}'))">Facebook</div>
           <div class="share-btn share-copy" onclick="navigator.clipboard.writeText('https://maltaeventguide.com/event/${slug}');this.textContent='Copied!'">Copy Link</div>
