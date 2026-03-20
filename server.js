@@ -1637,11 +1637,11 @@ app.get('/event/:slug', async (req, res) => {
 
     .wrapper { max-width:960px; margin:30px auto; padding:0 20px 40px; }
 
-    .event-layout { background:white; border-radius:20px; overflow:hidden; box-shadow:0 4px 24px rgba(0,0,0,0.08); }
+    .event-layout { display:grid; grid-template-columns:420px 1fr; gap:0; background:white; border-radius:20px; overflow:hidden; box-shadow:0 4px 24px rgba(0,0,0,0.08); }
 
-    .event-img { text-align:center; background:#f8fafc; }
-    .event-img img { max-width:100%; max-height:600px; display:block; margin:0 auto; }
-    .event-img .fallback { height:200px;display:flex;align-items:center;justify-content:center;color:white;font-size:6rem;font-weight:800;background:#1e293b; }
+    .event-img { overflow:hidden; background:#f1f5f9; }
+    .event-img img { width:100%; display:block; }
+    .event-img .fallback { height:100%;min-height:350px;display:flex;align-items:center;justify-content:center;color:white;font-size:6rem;font-weight:800;background:#1e293b; }
 
     .event-details { padding:32px; display:flex; flex-direction:column; }
 
@@ -1662,6 +1662,8 @@ app.get('/event/:slug', async (req, res) => {
     .desc p:last-child { margin-bottom:0; }
     .video-embed { position:relative; padding-bottom:56.25%; height:0; margin:18px 0; border-radius:12px; overflow:hidden; background:#000; }
     .video-embed iframe { position:absolute; top:0; left:0; width:100%; height:100%; border:0; }
+    .ig-embed { margin:18px 0; border-radius:12px; overflow:hidden; }
+    .ig-embed iframe { width:100%; border:0; border-radius:12px; min-height:500px; }
 
     .cta { display:block; width:100%; padding:16px; background:#0f172a; color:white; text-align:center; border-radius:12px; font-weight:800; font-size:1.05rem; transition:0.3s; box-sizing:border-box; }
     .cta:hover { background:var(--primary); transform:translateY(-2px); box-shadow:0 8px 25px rgba(255,56,92,0.3); }
@@ -1689,7 +1691,7 @@ app.get('/event/:slug', async (req, res) => {
     .footer a { color:#94a3b8; }
 
     @media (max-width:750px) {
-      .event-img img { max-height:450px; }
+      .event-layout { grid-template-columns:1fr; }
       .event-details { padding:24px; }
       h1 { font-size:1.4rem; }
       .wrapper { margin-top:15px; }
@@ -1729,8 +1731,10 @@ app.get('/event/:slug', async (req, res) => {
           .replace(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{11})(?:[^\s]*)/g, '</p><div class="video-embed"><iframe src="https://www.youtube.com/embed/$1?rel=0" allowfullscreen loading="lazy"></iframe></div><p>')
           // Convert Vimeo links to embeds (vimeo.com/ID, vimeo.com/manage/videos/ID, vimeo.com/channels/xxx/ID, player.vimeo.com/video/ID)
           .replace(/(?:https?:\/\/)?(?:www\.)?(?:player\.)?vimeo\.com\/(?:manage\/videos\/|channels\/[\w]+\/|video\/)?(\d{6,})(?:[^\s]*)/g, '</p><div class="video-embed"><iframe src="https://player.vimeo.com/video/$1" allowfullscreen loading="lazy"></iframe></div><p>')
+          // Convert Instagram reel/post/p links to embeds
+          .replace(/(?:https?:\/\/)?(?:www\.)?instagram\.com\/(?:reel|p|tv)\/([\w-]+)(?:[^\s]*)/g, '</p><div class="ig-embed" data-url="https://www.instagram.com/p/$1/embed"></div><p>')
           // Convert plain URLs to clickable links (skip already converted ones)
-          .replace(/(?<!src="|href="|")(https?:\/\/[^\s<"]+)/g, '<a href="$1" target="_blank" rel="noopener" style="color:#FF385C;word-break:break-all">$1</a>')
+          .replace(/(?<!src="|href="|"|data-url=")(https?:\/\/[^\s<"]+)/g, '<a href="$1" target="_blank" rel="noopener" style="color:#FF385C;word-break:break-all">$1</a>')
           // Paragraphs and line breaks
           .replace(/\n\n+/g, '</p><p>').replace(/\n/g, '<br>').replace(/^/, '<p>').replace(/$/, '</p>')
           // Clean up empty paragraphs
@@ -1738,7 +1742,7 @@ app.get('/event/:slug', async (req, res) => {
           + '</div>' : ''}
         ${externalUrl ? '<a href="' + externalUrl + '" target="_blank" class="cta" onclick="fetch(\'/api/track\',{method:\'POST\',headers:{\'Content-Type\':\'application/json\'},body:JSON.stringify({event_id:' + event.id + ',event_title:\'' + title.replace(/'/g, "\\'") + '\',source:\'' + source + '\'})})">View Event / Get Tickets →</a>' : '<a href="/" class="cta">← Browse More Events</a>'}
         <div class="share-row">
-          <div class="share-btn share-calendar" onclick="addToCalendar()"> Add to Calendar</div>
+          <div class="share-btn share-calendar" onclick="addToCalendar()">Add to Calendar</div>
           <div class="share-btn share-whatsapp" onclick="window.open('https://wa.me/?text='+encodeURIComponent('${title.replace(/'/g, "\\'")} - https://maltaeventguide.com/event/${slug}'))">WhatsApp</div>
           <div class="share-btn share-facebook" onclick="window.open('https://www.facebook.com/sharer/sharer.php?u='+encodeURIComponent('https://maltaeventguide.com/event/${slug}'))">Facebook</div>
           <div class="share-btn share-copy" onclick="navigator.clipboard.writeText('https://maltaeventguide.com/event/${slug}');this.textContent='Copied!'">Copy Link</div>
@@ -1776,6 +1780,18 @@ app.get('/event/:slug', async (req, res) => {
           link.download=title.replace(/[^a-zA-Z0-9]/g,'-').substring(0,40)+'.ics';
           link.click();
         }
+        // Load Instagram embeds
+        document.querySelectorAll('.ig-embed').forEach(function(el){
+          var url=el.getAttribute('data-url');
+          if(url){
+            var iframe=document.createElement('iframe');
+            iframe.src=url;
+            iframe.setAttribute('allowfullscreen','true');
+            iframe.setAttribute('loading','lazy');
+            iframe.setAttribute('scrolling','no');
+            el.appendChild(iframe);
+          }
+        });
         </script>
       </div>
     </div>
