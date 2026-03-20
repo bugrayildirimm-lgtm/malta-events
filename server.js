@@ -1216,7 +1216,7 @@ app.get('/', async (req, res) => {
           const slug = e.slug || generateSlug(e.title);
           const img = e.image_url && e.image_url.startsWith('http') ? e.image_url : '';
           const catEmoji = {'Music & Concerts':'🎵','Theatre & Shows':'🎭','Dance':'💃','Nightlife & Parties':'🎉','Festivals':'🎪','Arts & Culture':'🎨','Sports & Adventure':'🏃','Food & Drink':'🍷','Family':'👨‍👩‍👧','Religious':'⛪','Conference':'📋','Other':'📌'}[e.category] || '📌';
-          const imgHtml = img ? '<div style="background:white;display:flex;align-items:center;justify-content:center;overflow:hidden"><img src="' + img + '" alt="' + (e.title||'').replace(/"/g,'&quot;') + ' — event in Malta" loading="lazy" style="width:100%;display:block;object-fit:cover;height:280px"></div>' : '<div style="height:120px;background:linear-gradient(135deg,#0f172a,#1e3a5f);display:flex;align-items:center;justify-content:center;font-size:3rem">' + catEmoji + '</div>';
+          const imgHtml = img ? '<div style="overflow:hidden;height:280px"><img src="' + img + '" alt="' + (e.title||'').replace(/"/g,'&quot;') + ' — event in Malta" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block"></div>' : '<div style="height:120px;background:linear-gradient(135deg,#0f172a,#1e3a5f);display:flex;align-items:center;justify-content:center;font-size:3rem">' + catEmoji + '</div>';
           return '<a href="/event/' + slug + '" style="text-decoration:none;display:block;background:white;border-radius:20px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08);border:2px solid #fbbf24;transition:all 0.3s" onmouseover="this.style.transform=\'translateY(-4px)\';this.style.boxShadow=\'0 12px 35px rgba(251,191,36,0.2)\'" onmouseout="this.style.transform=\'\';this.style.boxShadow=\'0 4px 20px rgba(0,0,0,0.08)\'">'
             + imgHtml
             + '<div style="padding:16px 18px 18px">'
@@ -1639,9 +1639,9 @@ app.get('/event/:slug', async (req, res) => {
 
     .event-layout { display:grid; grid-template-columns:420px 1fr; gap:0; background:white; border-radius:20px; overflow:hidden; box-shadow:0 4px 24px rgba(0,0,0,0.08); }
 
-    .event-img { background:white; display:flex; align-items:flex-start; justify-content:center; overflow:hidden; }
-    .event-img img { width:100%; display:block; object-fit:cover; min-height:300px; max-height:600px; }
-    .event-img .fallback { width:100%;min-height:350px;display:flex;align-items:center;justify-content:center;color:white;font-size:6rem;font-weight:800;background:#1e293b; }
+    .event-img { overflow:hidden; position:relative; background:#f1f5f9; }
+    .event-img img { width:100%; height:100%; object-fit:cover; position:absolute; top:0; left:0; min-height:100%; }
+    .event-img .fallback { width:100%;height:100%;min-height:350px;display:flex;align-items:center;justify-content:center;color:white;font-size:6rem;font-weight:800;background:#1e293b; position:absolute;top:0;left:0; }
 
     .event-details { padding:32px; display:flex; flex-direction:column; }
 
@@ -1690,7 +1690,7 @@ app.get('/event/:slug', async (req, res) => {
 
     @media (max-width:750px) {
       .event-layout { grid-template-columns:1fr; }
-      .event-img img { max-height:450px; }
+      .event-img { position:relative; height:350px; }
       .event-details { padding:24px; }
       h1 { font-size:1.4rem; }
       .wrapper { margin-top:15px; }
