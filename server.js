@@ -1662,8 +1662,8 @@ app.get('/event/:slug', async (req, res) => {
     .desc p:last-child { margin-bottom:0; }
     .video-embed { position:relative; padding-bottom:56.25%; height:0; margin:18px 0; border-radius:12px; overflow:hidden; background:#000; }
     .video-embed iframe { position:absolute; top:0; left:0; width:100%; height:100%; border:0; }
-    .ig-embed { margin:18px 0; border-radius:12px; overflow:hidden; }
-    .ig-embed iframe { width:100%; border:0; border-radius:12px; min-height:680px; }
+    .ig-embed { margin:18px 0; border-radius:12px; overflow:hidden; max-width:400px; }
+    .ig-embed iframe { width:100%; border:0; border-radius:12px; height:720px; }
 
     .cta { display:block; width:100%; padding:16px; background:#0f172a; color:white; text-align:center; border-radius:12px; font-weight:800; font-size:1.05rem; transition:0.3s; box-sizing:border-box; }
     .cta:hover { background:var(--primary); transform:translateY(-2px); box-shadow:0 8px 25px rgba(255,56,92,0.3); }
@@ -1742,7 +1742,7 @@ app.get('/event/:slug', async (req, res) => {
           + '</div>' : ''}
         ${externalUrl ? '<a href="' + externalUrl + '" target="_blank" class="cta" onclick="fetch(\'/api/track\',{method:\'POST\',headers:{\'Content-Type\':\'application/json\'},body:JSON.stringify({event_id:' + event.id + ',event_title:\'' + title.replace(/'/g, "\\'") + '\',source:\'' + source + '\'})})">View Event / Get Tickets →</a>' : '<a href="/" class="cta">← Browse More Events</a>'}
         <div class="share-row">
-          <div class="share-btn share-calendar" onclick="addToCalendar()">Add to Calendar</div>
+          <div class="share-btn share-calendar" onclick="addToCalendar()">📅 Add to Calendar</div>
           <div class="share-btn share-whatsapp" onclick="window.open('https://wa.me/?text='+encodeURIComponent('${title.replace(/'/g, "\\'")} - https://maltaeventguide.com/event/${slug}'))">WhatsApp</div>
           <div class="share-btn share-facebook" onclick="window.open('https://www.facebook.com/sharer/sharer.php?u='+encodeURIComponent('https://maltaeventguide.com/event/${slug}'))">Facebook</div>
           <div class="share-btn share-copy" onclick="navigator.clipboard.writeText('https://maltaeventguide.com/event/${slug}');this.textContent='Copied!'">Copy Link</div>
@@ -1882,9 +1882,17 @@ app.get('/event/:slug', async (req, res) => {
 app.post('/api/track', async (req, res) => {
   try {
     const { event_id, event_title, source } = req.body;
+    // Normalize source name
+    let src = (source || '').trim();
+    const srcLower = src.toLowerCase();
+    if (srcLower.startsWith('showshappening')) src = 'ShowsHappening';
+    else if (srcLower.startsWith('eventworks')) src = 'EventWorks';
+    else if (srcLower.startsWith('visitmalta')) src = 'VisitMalta';
+    else if (srcLower.startsWith('resident advisor')) src = 'Resident Advisor';
+    else if (srcLower.startsWith('community events')) src = 'Community Events Malta';
     await pool.query(
       'INSERT INTO click_tracking (event_id, event_title, source, user_agent, referrer) VALUES ($1, $2, $3, $4, $5)',
-      [event_id, event_title, source, req.headers['user-agent']||'', req.headers['referer']||'']
+      [event_id, event_title, src, req.headers['user-agent']||'', req.headers['referer']||'']
     );
     res.json({ ok: true });
   } catch (e) { res.json({ ok: false }); }
@@ -3932,16 +3940,46 @@ app.get('/admin/api/analytics', async (req, res) => {
     const week = await pool.query("SELECT COUNT(*) as c FROM click_tracking WHERE clicked_at >= CURRENT_DATE - INTERVAL '7 days'");
     const month = await pool.query("SELECT COUNT(*) as c FROM click_tracking WHERE clicked_at >= CURRENT_DATE - INTERVAL '30 days'");
     const unique = await pool.query('SELECT COUNT(DISTINCT event_id) as c FROM click_tracking');
-    const top = await pool.query('SELECT event_title, source, COUNT(*) as clicks, MAX(clicked_at) as last_click FROM click_tracking GROUP BY event_title, source ORDER BY clicks DESC LIMIT 100');
-    // Per-source totals
-    const sourceTotals = await pool.query('SELECT source, COUNT(*) as clicks FROM click_tracking GROUP BY source ORDER BY clicks DESC');
+    // Group by event title only (not source) so same event isn't split
+    const top = await pool.query(`
+      SELECT event_title, 
+        CASE 
+          WHEN LOWER(source) LIKE 'showshappening%' THEN 'ShowsHappening'
+          WHEN LOWER(source) LIKE 'eventworks%' THEN 'EventWorks'
+          WHEN LOWER(source) LIKE 'visitmalta%' THEN 'VisitMalta'
+          WHEN LOWER(source) LIKE 'resident advisor%' THEN 'Resident Advisor'
+          WHEN LOWER(source) LIKE 'community events%' THEN 'Community Events Malta'
+          ELSE source
+        END as source_normalized,
+        COUNT(*) as clicks, 
+        MAX(clicked_at) as last_click 
+      FROM click_tracking 
+      GROUP BY event_title, source_normalized
+      ORDER BY clicks DESC LIMIT 100
+    `);
+    // Normalized source totals
+    const sourceTotals = await pool.query(`
+      SELECT 
+        CASE 
+          WHEN LOWER(source) LIKE 'showshappening%' THEN 'ShowsHappening'
+          WHEN LOWER(source) LIKE 'eventworks%' THEN 'EventWorks'
+          WHEN LOWER(source) LIKE 'visitmalta%' THEN 'VisitMalta'
+          WHEN LOWER(source) LIKE 'resident advisor%' THEN 'Resident Advisor'
+          WHEN LOWER(source) LIKE 'community events%' THEN 'Community Events Malta'
+          ELSE source
+        END as source, 
+        COUNT(*) as clicks 
+      FROM click_tracking 
+      GROUP BY 1 
+      ORDER BY clicks DESC
+    `);
     res.json({
       total_clicks: total.rows[0].c,
       today_clicks: today.rows[0].c,
       week_clicks: week.rows[0].c,
       month_clicks: month.rows[0].c,
       unique_events: unique.rows[0].c,
-      top_events: top.rows,
+      top_events: top.rows.map(r => ({ ...r, source: r.source_normalized || r.source })),
       source_totals: sourceTotals.rows
     });
   } catch (e) { res.json({ total_clicks: 0, today_clicks: 0, week_clicks: 0, month_clicks: 0, unique_events: 0, top_events: [], source_totals: [] }); }
