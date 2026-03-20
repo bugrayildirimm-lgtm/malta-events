@@ -1724,7 +1724,18 @@ app.get('/event/:slug', async (req, res) => {
           ${event.category ? '<div class="info-row"><div class="info-icon cat">' + (catEmojis[event.category]||'📌') + '</div><div><div class="info-label">' + event.category + '</div></div></div>' : ''}
           ${event.recurring ? '<div class="info-row"><div class="info-icon recur">🔁</div><div><div class="info-label">' + event.recurring + '</div></div></div>' : ''}
         </div>
-        ${event.description ? '<div class="desc">' + event.description.replace(/\n\n+/g, '</p><p>').replace(/\n/g, '<br>').replace(/^/, '<p>').replace(/$/, '</p>') + '</div>' : ''}
+        ${event.description ? '<div class="desc">' + event.description
+          // Convert YouTube links to embeds
+          .replace(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]{11})(?:[^\s]*)/g, '</p><div style="position:relative;padding-bottom:56.25%;height:0;margin:16px 0;border-radius:12px;overflow:hidden"><iframe src="https://www.youtube.com/embed/$1" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" allowfullscreen loading="lazy"></iframe></div><p>')
+          // Convert Vimeo links to embeds
+          .replace(/(?:https?:\/\/)?(?:www\.)?vimeo\.com\/(\d+)(?:[^\s]*)/g, '</p><div style="position:relative;padding-bottom:56.25%;height:0;margin:16px 0;border-radius:12px;overflow:hidden"><iframe src="https://player.vimeo.com/video/$1" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" allowfullscreen loading="lazy"></iframe></div><p>')
+          // Convert plain URLs to clickable links (but not ones already converted)
+          .replace(/(?<!src="|href=")(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener" style="color:#FF385C;word-break:break-all">$1</a>')
+          // Paragraphs and line breaks
+          .replace(/\n\n+/g, '</p><p>').replace(/\n/g, '<br>').replace(/^/, '<p>').replace(/$/, '</p>')
+          // Clean up empty paragraphs
+          .replace(/<p>\s*<\/p>/g, '')
+          + '</div>' : ''}
         ${externalUrl ? '<a href="' + externalUrl + '" target="_blank" class="cta" onclick="fetch(\'/api/track\',{method:\'POST\',headers:{\'Content-Type\':\'application/json\'},body:JSON.stringify({event_id:' + event.id + ',event_title:\'' + title.replace(/'/g, "\\'") + '\',source:\'' + source + '\'})})">View Event / Get Tickets →</a>' : '<a href="/" class="cta">← Browse More Events</a>'}
         <div class="share-row">
           <div class="share-btn share-calendar" onclick="addToCalendar()">📅 Add to Calendar</div>
