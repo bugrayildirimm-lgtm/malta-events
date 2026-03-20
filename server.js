@@ -1663,7 +1663,7 @@ app.get('/event/:slug', async (req, res) => {
     .video-embed { position:relative; padding-bottom:56.25%; height:0; margin:18px 0; border-radius:12px; overflow:hidden; background:#000; }
     .video-embed iframe { position:absolute; top:0; left:0; width:100%; height:100%; border:0; }
     .ig-embed { margin:18px 0; border-radius:12px; overflow:hidden; }
-    .ig-embed iframe { width:100%; border:0; border-radius:12px; min-height:500px; }
+    .ig-embed iframe { width:100%; border:0; border-radius:12px; min-height:680px; }
 
     .cta { display:block; width:100%; padding:16px; background:#0f172a; color:white; text-align:center; border-radius:12px; font-weight:800; font-size:1.05rem; transition:0.3s; box-sizing:border-box; }
     .cta:hover { background:var(--primary); transform:translateY(-2px); box-shadow:0 8px 25px rgba(255,56,92,0.3); }
