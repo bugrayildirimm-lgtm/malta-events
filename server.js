@@ -1552,13 +1552,15 @@ app.get('/event/:slug', async (req, res) => {
     // Structured data for this specific event
     const startDate = getStartDate(event.event_date);
     const endDate = getEndDate(event.event_date);
+    const startDateStr = startDate ? startDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+    const endDateStr = endDate ? endDate.toISOString().split('T')[0] : startDateStr;
     const jsonLd = {
       "@context": "https://schema.org",
       "@type": "Event",
       "name": title,
       "description": event.description || desc,
-      "startDate": startDate ? startDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-      "endDate": endDate ? endDate.toISOString().split('T')[0] : (startDate ? startDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0]),
+      "startDate": startDateStr,
+      "endDate": endDateStr,
       "eventStatus": "https://schema.org/EventScheduled",
       "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
       "location": {
@@ -1570,23 +1572,21 @@ app.get('/event/:slug', async (req, res) => {
         "@type": "Organization",
         "name": event.source_name || "Malta Event Guide",
         "url": "https://maltaeventguide.com"
+      },
+      "performer": {
+        "@type": "PerformingGroup",
+        "name": event.source_name || title
+      },
+      "offers": {
+        "@type": "Offer",
+        "url": externalUrl || ("https://maltaeventguide.com/event/" + slug),
+        "price": "0",
+        "priceCurrency": "EUR",
+        "validFrom": startDateStr,
+        "availability": "https://schema.org/InStock"
       }
     };
     if (hasImg) jsonLd.image = img;
-    if (externalUrl) {
-      jsonLd.url = externalUrl;
-      jsonLd.offers = {
-        "@type": "Offer",
-        "url": externalUrl,
-        "availability": "https://schema.org/InStock"
-      };
-    }
-    if (event.source_name) {
-      jsonLd.performer = {
-        "@type": "PerformingGroup",
-        "name": event.source_name
-      };
-    }
 
     const firstLetter = title.charAt(0).toUpperCase();
     const colors = [
@@ -1742,7 +1742,7 @@ app.get('/event/:slug', async (req, res) => {
           + '</div>' : ''}
         ${externalUrl ? '<a href="' + externalUrl + '" target="_blank" class="cta" onclick="fetch(\'/api/track\',{method:\'POST\',headers:{\'Content-Type\':\'application/json\'},body:JSON.stringify({event_id:' + event.id + ',event_title:\'' + title.replace(/'/g, "\\'") + '\',source:\'' + source + '\'})})">View Event / Get Tickets →</a>' : '<a href="/" class="cta">← Browse More Events</a>'}
         <div class="share-row">
-          <div class="share-btn share-calendar" onclick="addToCalendar()">Add to Calendar</div>
+          <div class="share-btn share-calendar" onclick="addToCalendar()">📅 Add to Calendar</div>
           <div class="share-btn share-whatsapp" onclick="window.open('https://wa.me/?text='+encodeURIComponent('${title.replace(/'/g, "\\'")} - https://maltaeventguide.com/event/${slug}'))">WhatsApp</div>
           <div class="share-btn share-facebook" onclick="window.open('https://www.facebook.com/sharer/sharer.php?u='+encodeURIComponent('https://maltaeventguide.com/event/${slug}'))">Facebook</div>
           <div class="share-btn share-copy" onclick="navigator.clipboard.writeText('https://maltaeventguide.com/event/${slug}');this.textContent='Copied!'">Copy Link</div>
