@@ -1909,7 +1909,7 @@ app.post('/api/track', async (req, res) => {
 
 // Email subscribe (public) — also syncs to Brevo
 const BREVO_SMTP_KEY = process.env.BREVO_SMTP_KEY || '';
-const BREVO_SENDER = process.env.BREVO_SENDER || 'hello@maltaeventguide.com';
+const BREVO_SENDER = process.env.BREVO_SENDER || 'hello@bugrayildirim.me';
 
 app.post('/api/subscribe', async (req, res) => {
   try {
