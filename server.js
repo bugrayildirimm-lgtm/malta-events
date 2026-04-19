@@ -1214,16 +1214,18 @@ app.get('/', async (req, res) => {
     const featured = allEvents.filter(e => e.featured);
     if (featured.length === 0) return '';
     const fCount = featured.length;
+    // Fixed column width, centered, works for any count
+    const colWidth = fCount === 1 ? '380px' : '320px';
     return `
-    <div style="max-width:${fCount === 1 ? '500' : fCount === 2 ? '900' : '1400'}px;margin:0 auto;padding:0 20px 25px">
+    <div style="max-width:1400px;margin:0 auto;padding:0 20px 25px">
       <h2 style="font-size:1.3rem;font-weight:800;margin:0 0 15px;color:#1e293b">⭐ Featured Events</h2>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(${fCount === 1 ? '300' : '280'}px,1fr));gap:20px">
+      <div style="display:flex;flex-wrap:wrap;gap:20px;justify-content:center">
         ${featured.map(e => {
           const slug = e.slug || generateSlug(e.title);
           const img = e.image_url && e.image_url.startsWith('http') ? e.image_url : '';
           const catEmoji = {'Music & Concerts':'🎵','Theatre & Shows':'🎭','Dance':'💃','Nightlife & Parties':'🎉','Festivals':'🎪','Arts & Culture':'🎨','Sports & Adventure':'🏃','Food & Drink':'🍷','Family':'👨‍👩‍👧','Religious':'⛪','Conference':'📋','Other':'📌'}[e.category] || '📌';
           const imgHtml = img ? '<div style="overflow:hidden;height:280px"><img src="' + img + '" alt="' + (e.title||'').replace(/"/g,'&quot;') + ' — event in Malta" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block"></div>' : '<div style="height:120px;background:linear-gradient(135deg,#0f172a,#1e3a5f);display:flex;align-items:center;justify-content:center;font-size:3rem">' + catEmoji + '</div>';
-          return '<a href="/event/' + slug + '" style="text-decoration:none;display:block;background:white;border-radius:20px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08);border:2px solid #fbbf24;transition:all 0.3s" onmouseover="this.style.transform=\'translateY(-4px)\';this.style.boxShadow=\'0 12px 35px rgba(251,191,36,0.2)\'" onmouseout="this.style.transform=\'\';this.style.boxShadow=\'0 4px 20px rgba(0,0,0,0.08)\'">'
+          return '<a href="/event/' + slug + '" style="text-decoration:none;display:block;background:white;border-radius:20px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08);border:2px solid #fbbf24;transition:all 0.3s;width:' + colWidth + ';flex-shrink:0" onmouseover="this.style.transform=\'translateY(-4px)\';this.style.boxShadow=\'0 12px 35px rgba(251,191,36,0.2)\'" onmouseout="this.style.transform=\'\';this.style.boxShadow=\'0 4px 20px rgba(0,0,0,0.08)\'">'
             + imgHtml
             + '<div style="padding:16px 18px 18px">'
             + '<div style="display:inline-block;background:linear-gradient(135deg,#f59e0b,#d97706);color:white;padding:3px 10px;border-radius:20px;font-size:0.65rem;font-weight:800;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">⭐ Featured</div>'
@@ -1646,10 +1648,10 @@ app.get('/event/:slug', async (req, res) => {
 
     .wrapper { max-width:960px; margin:30px auto; padding:0 20px 40px; }
 
-    .event-layout { display:grid; grid-template-columns:420px 1fr; gap:0; background:white; border-radius:20px; overflow:hidden; box-shadow:0 4px 24px rgba(0,0,0,0.08); }
+    .event-layout { display:grid; grid-template-columns:420px 1fr; gap:0; background:white; border-radius:20px; overflow:hidden; box-shadow:0 4px 24px rgba(0,0,0,0.08); align-items:start; }
 
-    .event-img { overflow:hidden; background:#f1f5f9; }
-    .event-img img { width:100%; display:block; }
+    .event-img { overflow:hidden; background:#f1f5f9; min-height:350px; }
+    .event-img img { width:100%; min-height:350px; object-fit:cover; display:block; }
     .event-img .fallback { height:100%;min-height:350px;display:flex;align-items:center;justify-content:center;color:white;font-size:6rem;font-weight:800;background:#1e293b; }
 
     .event-details { padding:32px; display:flex; flex-direction:column; }
@@ -1701,6 +1703,8 @@ app.get('/event/:slug', async (req, res) => {
 
     @media (max-width:750px) {
       .event-layout { grid-template-columns:1fr; }
+      .event-img { min-height:auto; }
+      .event-img img { min-height:auto; object-fit:contain; max-height:450px; background:#f1f5f9; }
       .event-details { padding:24px; }
       h1 { font-size:1.4rem; }
       .wrapper { margin-top:15px; }
