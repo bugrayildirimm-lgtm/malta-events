@@ -3892,6 +3892,25 @@ app.post('/admin/api/cleanup-locations', async (req, res) => {
   } catch (e) { res.json({ error: e.message }); }
 });
 
+// Remove ShowsHappening branded images from existing events
+app.post('/admin/api/cleanup-images', async (req, res) => {
+  if (!authCheck(req, res)) return;
+  try {
+    const result = await pool.query("SELECT id, title, image_url FROM events WHERE image_url IS NOT NULL");
+    let fixed = 0;
+    for (const row of result.rows) {
+      const img = (row.image_url || '').toLowerCase();
+      if (img.includes('online-tickets') || img.includes('online_tickets') ||
+          (img.includes('showshappening.com/images') && !img.includes('blob.core.windows.net'))) {
+        await pool.query('UPDATE events SET image_url = NULL WHERE id = $1', [row.id]);
+        fixed++;
+        console.log(`[Cleanup] Removed branded image from: ${row.title}`);
+      }
+    }
+    res.json({ ok: true, fixed, checked: result.rows.length });
+  } catch (e) { res.json({ error: e.message }); }
+});
+
 // Remove duplicate events - keeps the one with most data
 app.post('/admin/api/remove-duplicates', async (req, res) => {
   if (!authCheck(req, res)) return;

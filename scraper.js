@@ -68,7 +68,14 @@ async function scrapeShowsHappening(browser) {
         return {
           title,
           url: a.href,
-          image_url: a.querySelector('img') ? a.querySelector('img').src : null,
+          image_url: (() => {
+            const img = a.querySelector('img');
+            if (!img) return null;
+            const src = img.src || '';
+            // Skip ShowsHappening branded images
+            if (src.includes('Online-tickets') || src.includes('online-tickets') || src.includes('showshappening.com/images')) return null;
+            return src;
+          })(),
           date,
           price,
         };
@@ -216,26 +223,43 @@ async function scrapeShowsHappening(browser) {
           
           // --- IMAGE (higher quality from event page) ---
           let image = '';
-          // First try to find the actual event flyer (not the ShowsHappening branded banner)
           const imgs = Array.from(document.querySelectorAll('img'));
-          // Look for blob storage flyer images first (these are the actual event posters)
+          
+          // Priority 1: Blob storage flyer images (actual event posters uploaded by organizers)
           const flyerImg = imgs.find(img => img.src && img.src.includes('blob.core.windows.net') && img.src.includes('flyer'));
           if (flyerImg) {
             image = flyerImg.src;
-          } else {
-            // Try large images that aren't ShowsHappening branding
-            const eventImg = imgs.find(img => img.src && img.width > 200 
-              && !img.src.includes('logo') && !img.src.includes('icon') 
-              && !img.src.includes('showshappening') && !img.src.includes('ShowsHappening')
-              && !img.src.includes('Online-tickets'));
-            if (eventImg) image = eventImg.src;
           }
-          // Only fall back to og:image if we found nothing better AND it's not ShowsHappening branded
+          
+          // Priority 2: Any blob storage image from ShowsHappening (event content, not branding)
+          if (!image) {
+            const blobImg = imgs.find(img => img.src && img.src.includes('blob.core.windows.net') && !img.src.includes('logo') && !img.src.includes('icon'));
+            if (blobImg) image = blobImg.src;
+          }
+          
+          // Priority 3: Large content images (not branding, not tiny icons)
+          if (!image) {
+            const contentImg = imgs.find(img => {
+              const src = img.src || '';
+              if (!src || !src.startsWith('http')) return false;
+              if (src.includes('logo') || src.includes('icon') || src.includes('avatar')) return false;
+              if (src.includes('showshappening.com') || src.includes('ShowsHappening')) return false;
+              if (src.includes('Online-tickets') || src.includes('online-tickets')) return false;
+              if (src.includes('favicon') || src.includes('spinner') || src.includes('loading')) return false;
+              // Check natural dimensions if available, or accept if src looks like content
+              const w = img.naturalWidth || img.width || 0;
+              if (w > 0 && w < 100) return false;
+              return true;
+            });
+            if (contentImg) image = contentImg.src;
+          }
+          
+          // Priority 4: og:image only if not ShowsHappening branded
           if (!image) {
             const ogImage = document.querySelector('meta[property="og:image"]');
             if (ogImage) {
               const ogSrc = ogImage.getAttribute('content') || '';
-              if (ogSrc && !ogSrc.includes('showshappening') && !ogSrc.includes('ShowsHappening') && !ogSrc.includes('Online-tickets')) {
+              if (ogSrc && !ogSrc.includes('showshappening') && !ogSrc.includes('ShowsHappening') && !ogSrc.includes('Online-tickets') && !ogSrc.includes('online-tickets')) {
                 image = ogSrc;
               }
             }
@@ -275,6 +299,16 @@ async function scrapeShowsHappening(browser) {
     // Step 3: Save to database (with duplicate title detection)
     for (const event of unique) {
       try {
+        // Final safety: strip branded ShowsHappening images before saving
+        if (event.image_url) {
+          const imgLower = event.image_url.toLowerCase();
+          if (imgLower.includes('online-tickets') || imgLower.includes('online_tickets') || 
+              (imgLower.includes('showshappening.com/images') && !imgLower.includes('blob.core.windows.net'))) {
+            console.log(`  [Image] Stripped branded image for "${event.title}"`);
+            event.image_url = null;
+          }
+        }
+        
         // Build description with price info
         let desc = event.description || '';
         if (event.price && !desc.includes(event.price)) {
