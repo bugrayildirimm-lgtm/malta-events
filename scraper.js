@@ -216,12 +216,29 @@ async function scrapeShowsHappening(browser) {
           
           // --- IMAGE (higher quality from event page) ---
           let image = '';
-          const ogImage = document.querySelector('meta[property="og:image"]');
-          if (ogImage) image = ogImage.getAttribute('content') || '';
-          if (!image) {
-            const imgs = Array.from(document.querySelectorAll('img'));
-            const eventImg = imgs.find(img => img.src && img.width > 200 && !img.src.includes('logo') && !img.src.includes('icon'));
+          // First try to find the actual event flyer (not the ShowsHappening branded banner)
+          const imgs = Array.from(document.querySelectorAll('img'));
+          // Look for blob storage flyer images first (these are the actual event posters)
+          const flyerImg = imgs.find(img => img.src && img.src.includes('blob.core.windows.net') && img.src.includes('flyer'));
+          if (flyerImg) {
+            image = flyerImg.src;
+          } else {
+            // Try large images that aren't ShowsHappening branding
+            const eventImg = imgs.find(img => img.src && img.width > 200 
+              && !img.src.includes('logo') && !img.src.includes('icon') 
+              && !img.src.includes('showshappening') && !img.src.includes('ShowsHappening')
+              && !img.src.includes('Online-tickets'));
             if (eventImg) image = eventImg.src;
+          }
+          // Only fall back to og:image if we found nothing better AND it's not ShowsHappening branded
+          if (!image) {
+            const ogImage = document.querySelector('meta[property="og:image"]');
+            if (ogImage) {
+              const ogSrc = ogImage.getAttribute('content') || '';
+              if (ogSrc && !ogSrc.includes('showshappening') && !ogSrc.includes('ShowsHappening') && !ogSrc.includes('Online-tickets')) {
+                image = ogSrc;
+              }
+            }
           }
           
           return { description, location, dateDetail, price, organizer, image };
@@ -255,13 +272,53 @@ async function scrapeShowsHappening(browser) {
     await detailPage.close();
     console.log(`  Enriched ${enriched}/${unique.length} events with page details.`);
 
-    // Step 3: Save to database
+    // Step 3: Save to database (with duplicate title detection)
     for (const event of unique) {
       try {
         // Build description with price info
         let desc = event.description || '';
         if (event.price && !desc.includes(event.price)) {
           desc = desc ? `Price: ${event.price}\n\n${desc}` : `Price: ${event.price}`;
+        }
+        
+        // Check if an event with same/similar title already exists (from any source)
+        const titleNorm = (event.title || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        const existing = await pool.query(
+          `SELECT id, title, source_url, image_url, description, location, event_date FROM events 
+           WHERE LOWER(regexp_replace(title, '[^a-zA-Z0-9]', '', 'g')) = $1 
+           AND COALESCE(status,'live') = 'live'`,
+          [titleNorm]
+        );
+        
+        if (existing.rows.length > 0 && !existing.rows.some(r => r.source_url === event.url)) {
+          // Event already exists from another source — enrich existing, don't create duplicate
+          const ex = existing.rows[0];
+          const updates = [];
+          const vals = [];
+          let paramIdx = 1;
+          
+          // Only update fields that are empty/missing on the existing event
+          if ((!ex.image_url || ex.image_url.includes('showshappening')) && event.image_url) {
+            updates.push(`image_url = $${paramIdx++}`); vals.push(event.image_url);
+          }
+          if ((!ex.description || ex.description.length < 20) && desc && desc.length > 20) {
+            updates.push(`description = $${paramIdx++}`); vals.push(desc);
+          }
+          if ((!ex.location || ex.location === 'Malta') && event.location && event.location !== 'Malta') {
+            updates.push(`location = $${paramIdx++}`); vals.push(event.location);
+          }
+          if (!ex.event_date && event.date) {
+            updates.push(`event_date = $${paramIdx++}`); vals.push(event.date);
+          }
+          
+          if (updates.length > 0) {
+            vals.push(ex.id);
+            await pool.query(`UPDATE events SET ${updates.join(', ')} WHERE id = $${paramIdx}`, vals);
+            console.log(`  [Dedup] Enriched existing "${ex.title}" (ID:${ex.id}) — skipped duplicate from ShowsHappening`);
+          } else {
+            console.log(`  [Dedup] Skipped "${event.title}" — already exists (ID:${ex.id})`);
+          }
+          continue; // Don't insert new row
         }
         
         await pool.query(
@@ -411,6 +468,29 @@ async function scrapeVisitMalta() {
 
     for (const event of events) {
       try {
+        // Duplicate check by normalized title
+        const titleNorm = (event.title || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (titleNorm.length > 3) {
+          const existing = await pool.query(
+            `SELECT id, title, source_url, image_url, description, location, event_date, category FROM events 
+             WHERE LOWER(regexp_replace(title, '[^a-zA-Z0-9]', '', 'g')) = $1 
+             AND COALESCE(status,'live') = 'live' AND source_url != $2`,
+            [titleNorm, event.url]
+          );
+          if (existing.rows.length > 0) {
+            const ex = existing.rows[0];
+            const updates = []; const vals = []; let p = 1;
+            if (!ex.image_url && event.image_url) { updates.push(`image_url = $${p++}`); vals.push(event.image_url); }
+            if ((!ex.description || ex.description.length < 20) && event.description && event.description.length > 20) { updates.push(`description = $${p++}`); vals.push(event.description); }
+            if ((!ex.location || ex.location === 'Malta') && event.location && event.location !== 'Malta') { updates.push(`location = $${p++}`); vals.push(event.location); }
+            if (!ex.event_date && event.date) { updates.push(`event_date = $${p++}`); vals.push(event.date); }
+            if (!ex.category && event.category) { updates.push(`category = $${p++}`); vals.push(event.category); }
+            if (updates.length > 0) { vals.push(ex.id); await pool.query(`UPDATE events SET ${updates.join(', ')} WHERE id = $${p}`, vals); }
+            console.log(`  [Dedup] Skipped VisitMalta "${event.title}" — exists as ID:${ex.id}`);
+            continue;
+          }
+        }
+
         await pool.query(
           `INSERT INTO events (title, location, source_url, image_url, event_date, description, category) 
            VALUES ($1, $2, $3, $4, $5, $6, $7) 
@@ -626,6 +706,28 @@ async function scrapeResidentAdvisor() {
       }
 
       try {
+        // Duplicate check
+        const titleNorm = (title || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (titleNorm.length > 3) {
+          const existing = await pool.query(
+            `SELECT id, title, source_url, image_url, description, location, event_date FROM events 
+             WHERE LOWER(regexp_replace(title, '[^a-zA-Z0-9]', '', 'g')) = $1 
+             AND COALESCE(status,'live') = 'live' AND source_url != $2`,
+            [titleNorm, sourceUrl]
+          );
+          if (existing.rows.length > 0) {
+            const ex = existing.rows[0];
+            const updates = []; const vals = []; let p = 1;
+            if (!ex.image_url && imageUrl) { updates.push(`image_url = $${p++}`); vals.push(imageUrl); }
+            if ((!ex.description || ex.description.length < 20) && description && description.length > 20) { updates.push(`description = $${p++}`); vals.push(description); }
+            if ((!ex.location || ex.location === 'Malta') && location && location !== 'Malta') { updates.push(`location = $${p++}`); vals.push(location); }
+            if (!ex.event_date && dateText) { updates.push(`event_date = $${p++}`); vals.push(dateText); }
+            if (updates.length > 0) { vals.push(ex.id); await pool.query(`UPDATE events SET ${updates.join(', ')} WHERE id = $${p}`, vals); }
+            console.log(`  [Dedup] Skipped RA "${title}" — exists as ID:${ex.id}`);
+            continue;
+          }
+        }
+
         await pool.query(
           `INSERT INTO events (title, location, source_url, image_url, event_date, description, category, source_name) 
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
@@ -761,6 +863,28 @@ async function scrapeEventWorks() {
     let saved = 0;
     for (const event of events) {
       try {
+        // Duplicate check
+        const titleNorm = (event.title || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (titleNorm.length > 3) {
+          const existing = await pool.query(
+            `SELECT id, title, source_url, image_url, description, location, event_date FROM events 
+             WHERE LOWER(regexp_replace(title, '[^a-zA-Z0-9]', '', 'g')) = $1 
+             AND COALESCE(status,'live') = 'live' AND source_url != $2`,
+            [titleNorm, event.url]
+          );
+          if (existing.rows.length > 0) {
+            const ex = existing.rows[0];
+            const updates = []; const vals = []; let p = 1;
+            if (!ex.image_url && event.image_url) { updates.push(`image_url = $${p++}`); vals.push(event.image_url); }
+            if ((!ex.description || ex.description.length < 20) && event.description && event.description.length > 20) { updates.push(`description = $${p++}`); vals.push(event.description); }
+            if ((!ex.location || ex.location === 'Malta') && event.location && event.location !== 'Malta') { updates.push(`location = $${p++}`); vals.push(event.location); }
+            if (!ex.event_date && event.date) { updates.push(`event_date = $${p++}`); vals.push(event.date); }
+            if (updates.length > 0) { vals.push(ex.id); await pool.query(`UPDATE events SET ${updates.join(', ')} WHERE id = $${p}`, vals); }
+            console.log(`  [Dedup] Skipped EventWorks "${event.title}" — exists as ID:${ex.id}`);
+            continue;
+          }
+        }
+
         await pool.query(
           `INSERT INTO events (title, location, source_url, image_url, event_date, description, category, source_name) 
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
