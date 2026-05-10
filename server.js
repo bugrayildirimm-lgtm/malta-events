@@ -1596,16 +1596,44 @@ app.get('/event/:slug', async (req, res) => {
       "performer": {
         "@type": "PerformingGroup",
         "name": event.source_name || title
-      },
-      "offers": {
+      }
+    };
+    // Extract price from description if available
+    const descText = event.description || '';
+    const priceMatch = descText.match(/(?:price|entry|ticket|cost|fee|admission)[:\s]*(?:€|EUR|eur)\s*(\d+(?:[.,]\d{2})?)/i)
+      || descText.match(/(?:price|entry|ticket|cost|fee|admission)[:\s]*(\d+(?:[.,]\d{2})?)\s*(?:€|EUR|eur)/i)
+      || descText.match(/(\d+(?:[.,]\d{2})?)\s*(?:€|EUR)\b/i)
+      || descText.match(/(?:€|EUR)\s*(\d+(?:[.,]\d{2})?)/i);
+    const priceVal = priceMatch ? priceMatch[1].replace(',', '.') : null;
+    const isFree = /\bfree\b|\bfree entry\b|\bno charge\b|\bfree admission\b/i.test(descText);
+    
+    if (isFree || priceVal === '0') {
+      jsonLd.offers = {
         "@type": "Offer",
         "url": externalUrl || ("https://maltaeventguide.com/event/" + slug),
         "price": "0",
         "priceCurrency": "EUR",
         "validFrom": startDateStr,
         "availability": "https://schema.org/InStock"
-      }
-    };
+      };
+    } else if (priceVal && parseFloat(priceVal) > 0) {
+      jsonLd.offers = {
+        "@type": "Offer",
+        "url": externalUrl || ("https://maltaeventguide.com/event/" + slug),
+        "price": priceVal,
+        "priceCurrency": "EUR",
+        "validFrom": startDateStr,
+        "availability": "https://schema.org/InStock"
+      };
+    } else {
+      // No price info — don't guess, just provide URL and availability
+      jsonLd.offers = {
+        "@type": "Offer",
+        "url": externalUrl || ("https://maltaeventguide.com/event/" + slug),
+        "validFrom": startDateStr,
+        "availability": "https://schema.org/InStock"
+      };
+    }
     if (hasImg) jsonLd.image = img;
 
     const firstLetter = title.charAt(0).toUpperCase();
