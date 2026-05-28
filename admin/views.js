@@ -219,14 +219,8 @@ function renderAddEventTab() {
       </div>
       <div class="form-group">
         <label>Source Name</label>
-        <select id="ae_source">
-          <option value="">-- Select --</option>
-          <option>ShowsHappening</option>
-          <option>VisitMalta</option>
-          <option>Resident Advisor</option>
-          <option>EventWorks</option>
-          <option>Manual</option>
-        </select>
+        <input id="ae_source" placeholder="Type anything - e.g. ShowsHappening, My Event, New Festival...">
+        <div class="hint">Type the source name. If it matches an existing one it will group under it. If it's new it will create a new source.</div>
       </div>
       <div class="form-group">
         <label>Recurring (optional)</label>

@@ -143,6 +143,7 @@ function createInstagramPost(eventId) {
       drawPost(img);
     };
     img.onerror = function () {
+      console.warn('Instagram generator: Failed to load event image via proxy, using gradient fallback');
       drawPost(null); // fallback without image
     };
     img.src = proxyUrl;

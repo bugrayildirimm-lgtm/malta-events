@@ -311,7 +311,8 @@ module.exports = function createAdminApi(deps) {
   // =====================================================================
 
   router.get('/proxy-image', async (req, res) => {
-    if (!authCheck(req, res)) return;
+    // No auth required - this is used by the Instagram post generator in the browser
+    // to safely load external images for canvas (avoids CORS issues). All images are public event photos.
     const url = req.query.url;
     if (!url) return res.status(400).send('Missing url');
 
