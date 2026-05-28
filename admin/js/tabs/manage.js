@@ -45,3 +45,23 @@ function delE(id) {
     us();
   });
 }
+
+function removeDuplicates() {
+  if (!confirm('Remove duplicate events? This will keep the best version of each (most complete data) and delete the rest. This cannot be undone.')) return;
+
+  api('POST', '/admin/api/remove-duplicates', {}, function (res) {
+    if (res.ok) {
+      toast('Removed ' + (res.removed || 0) + ' duplicates');
+      // Refresh data
+      fetch('/admin/api/events', { headers: { Authorization: auth } })
+        .then(r => r.json())
+        .then(data => {
+          E = data;
+          af4();
+          us();
+        });
+    } else {
+      toast('Error: ' + (res.error || 'Failed'), 1);
+    }
+  });
+}

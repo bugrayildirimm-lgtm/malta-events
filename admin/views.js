@@ -165,6 +165,7 @@ function renderManageTab() {
         <option value="visitmalta">VisitMalta</option>
         <option value="manual">Manual</option>
       </select>
+      <button onclick="removeDuplicates()" style="margin-left:auto;background:#ef4444;color:white;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-weight:700">🧹 Remove Duplicates</button>
     </div>
     <div class="events-grid" id="eg4"></div>
   `;
@@ -258,20 +259,26 @@ function renderAnalyticsTab() {
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:30px;margin-top:20px">
         <div>
-          <h3 style="margin:0 0 10px">Top Clicked Events</h3>
+          <h3 style="margin:0 0 10px;font-size:1.05rem">Top Clicked Events</h3>
           <table class="click-table" id="topTable"></table>
         </div>
         <div>
-          <h3 style="margin:0 0 10px">Clicks by Source</h3>
+          <h3 style="margin:0 0 10px;font-size:1.05rem">Clicks by Source</h3>
           <table class="click-table" id="sourceTable"></table>
         </div>
       </div>
 
-      <h3 style="margin:30px 0 10px">Recent Clicks</h3>
-      <table class="click-table" id="clickTable"></table>
-
-      <h3 style="margin:30px 0 10px">Email Subscribers <span id="subCount" style="color:#94a3b8;font-size:0.9rem;font-weight:400"></span></h3>
+      <h3 style="margin:30px 0 10px;font-size:1.05rem">Email Subscribers <span id="subCount" style="color:#94a3b8;font-size:0.9rem;font-weight:400"></span></h3>
       <div id="subscribersList" style="background:#1e293b;border:1px solid #334155;border-radius:12px;padding:15px;max-height:320px;overflow:auto"></div>
+
+      <div style="margin-top:40px;border-top:1px solid #334155;padding-top:25px">
+        <h3 style="margin:0 0 12px;font-size:1.05rem">📧 Send Newsletter to Subscribers</h3>
+        <input id="nlSubject" placeholder="Subject line" style="width:100%;padding:10px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:white;margin-bottom:8px">
+        <textarea id="nlPreview" placeholder="Short preview text (appears in inbox)" style="width:100%;height:70px;padding:10px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:white;margin-bottom:8px"></textarea>
+        <button onclick="sendNewsletter()" class="form-btn" style="width:auto;padding:10px 28px">Send to All Subscribers</button>
+        <button onclick="previewNewsletter()" style="margin-left:10px;padding:10px 18px;background:#334155;color:white;border:none;border-radius:8px;cursor:pointer">Preview</button>
+        <div id="nlResult" style="margin-top:10px;color:#94a3b8"></div>
+      </div>
     </div>
   `;
 }
@@ -279,11 +286,25 @@ function renderAnalyticsTab() {
 function renderInstagramTab() {
   return `
     <div style="padding:30px">
-      <h3>Instagram Image Picker</h3>
+      <h3>📸 Instagram Post Creator</h3>
+      <p style="color:#94a3b8;margin-bottom:15px">Click any event below to automatically generate a ready-to-post Instagram graphic using its image + details.</p>
       <div class="filters">
         <input type="text" id="igSearch" placeholder="Search events..." oninput="searchInstagram()">
       </div>
       <div id="igResults" class="events-grid"></div>
+    </div>
+
+    <!-- Instagram Post Generator Modal -->
+    <div id="igModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;align-items:center;justify-content:center">
+      <div style="background:#1e293b;border-radius:16px;padding:20px;max-width:520px;width:95%">
+        <h3 style="margin:0 0 10px">Instagram Post Preview</h3>
+        <canvas id="igCanvas" width="1080" height="1080" style="width:100%;border-radius:12px;background:#0f172a"></canvas>
+        <div style="margin-top:15px;display:flex;gap:10px">
+          <button onclick="downloadIgPost()" style="flex:1;padding:12px;background:#FF385C;color:white;border:none;border-radius:10px;font-weight:700">⬇️ Download PNG (1080x1080)</button>
+          <button onclick="closeIgModal()" style="flex:1;padding:12px;background:#334155;color:white;border:none;border-radius:10px">Close</button>
+        </div>
+        <div style="font-size:0.8rem;color:#64748b;margin-top:8px">Right-click the image above or use the download button. Add your own caption when posting.</div>
+      </div>
     </div>
   `;
 }

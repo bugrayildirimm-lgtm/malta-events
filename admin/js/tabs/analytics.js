@@ -6,40 +6,30 @@ function loadAnalytics() {
   fetch('/admin/api/analytics', { headers: { Authorization: auth } })
     .then(function (r) { return r.json(); })
     .then(function (d) {
-      // Stat cards - use the actual keys returned by the API
+      // Clean, simple stat cards
       var h = '<div class="sc"><div class="num">' + (d.total_clicks || 0) + '</div><div class="lbl">Total Clicks</div></div>';
-      h += '<div class="sc"><div class="num">' + (d.today_clicks || 0) + '</div><div class="lbl">Clicks Today</div></div>';
-      h += '<div class="sc"><div class="num">' + (d.week_clicks || 0) + '</div><div class="lbl">Clicks This Week</div></div>';
-      h += '<div class="sc"><div class="num">' + (d.month_clicks || 0) + '</div><div class="lbl">Clicks This Month</div></div>';
-      h += '<div class="sc"><div class="num">' + (d.unique_events || 0) + '</div><div class="lbl">Unique Events Clicked</div></div>';
+      h += '<div class="sc"><div class="num">' + (d.today_clicks || 0) + '</div><div class="lbl">Today</div></div>';
+      h += '<div class="sc"><div class="num">' + (d.week_clicks || 0) + '</div><div class="lbl">This Week</div></div>';
+      h += '<div class="sc"><div class="num">' + (d.unique_events || 0) + '</div><div class="lbl">Unique Events</div></div>';
 
       var cards = document.getElementById('statCards');
       if (cards) cards.innerHTML = h;
 
-      // Top clicked events
-      var topH = '<tr><th>Event</th><th>Source</th><th>Clicks</th><th>Last</th></tr>';
-      (d.top_events || []).slice(0, 12).forEach(function (c) {
-        topH += '<tr><td>' + esc(c.event_title) + '</td><td>' + esc(c.source || '') + '</td><td><strong>' + (c.clicks || 0) + '</strong></td><td>' + (c.last_click || '').substring(0, 16) + '</td></tr>';
+      // Simple Top 8 clicked events
+      var topH = '<tr><th>Event</th><th>Clicks</th></tr>';
+      (d.top_events || []).slice(0, 8).forEach(function (c) {
+        topH += '<tr><td>' + esc(c.event_title) + '</td><td><strong>' + (c.clicks || 0) + '</strong></td></tr>';
       });
       var topTable = document.getElementById('topTable');
       if (topTable) topTable.innerHTML = topH;
 
-      // Source breakdown
+      // Source summary (compact)
       var srcH = '<tr><th>Source</th><th>Clicks</th></tr>';
-      (d.source_totals || []).forEach(function (s) {
+      (d.source_totals || []).slice(0, 6).forEach(function (s) {
         srcH += '<tr><td>' + esc(s.source) + '</td><td><strong>' + (s.clicks || 0) + '</strong></td></tr>';
       });
       var srcTable = document.getElementById('sourceTable');
       if (srcTable) srcTable.innerHTML = srcH;
-
-      // Recent clicks (keep the original table)
-      var th = '<tr><th>Event</th><th>Source</th><th>When</th></tr>';
-      // Note: the /analytics endpoint currently does not return a "recent" array.
-      // We show a small note instead of leaving it empty.
-      var recentTable = document.getElementById('clickTable');
-      if (recentTable) {
-        recentTable.innerHTML = th + '<tr><td colspan="3" style="color:#64748b;padding:12px">Recent individual clicks are available in the click_tracking table. Top events and source breakdown shown above.</td></tr>';
-      }
     })
     .catch(function () { });
 
@@ -75,4 +65,42 @@ function loadSubscribers() {
       var c = document.getElementById('subscribersList');
       if (c) c.innerHTML = '<div style="color:#ef4444">Failed to load subscribers</div>';
     });
+}
+
+function previewNewsletter() {
+  var subject = document.getElementById('nlSubject').value.trim();
+  var previewText = document.getElementById('nlPreview').value.trim();
+
+  fetch('/admin/api/newsletter-preview', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: auth },
+    body: JSON.stringify({ subject: subject, previewText: previewText })
+  })
+  .then(r => r.text())
+  .then(html => {
+    var w = window.open('', '_blank');
+    w.document.write(html);
+  })
+  .catch(() => toast('Preview failed', 1));
+}
+
+function sendNewsletter() {
+  var subject = document.getElementById('nlSubject').value.trim();
+  var previewText = document.getElementById('nlPreview').value.trim();
+  var resultEl = document.getElementById('nlResult');
+
+  if (!subject) return toast('Please enter a subject', 1);
+
+  if (!confirm('Send this newsletter to ALL subscribers?')) return;
+
+  resultEl.textContent = 'Sending...';
+
+  api('POST', '/admin/api/send-newsletter', { subject: subject, previewText: previewText }, function (res) {
+    if (res.ok) {
+      resultEl.innerHTML = '<span style="color:#4ade80">✅ Sent to ' + (res.sent || 0) + ' subscribers</span>';
+      toast('Newsletter sent!');
+    } else {
+      resultEl.innerHTML = '<span style="color:#ef4444">Error: ' + (res.error || 'Failed') + '</span>';
+    }
+  });
 }
