@@ -1512,6 +1512,12 @@ app.get('/admin', (req, res) => {
   res.send(adminViews.getAdminHTML());
 });
 
+// Serve the concatenated admin JS bundle (core + all tabs + main)
+// This was previously inline in the monolith and got lost during the admin/ extraction.
+app.get('/admin/js', (req, res) => {
+  res.type('application/javascript').send(adminViews.getAdminJS());
+});
+
 
 
       
