@@ -5,6 +5,10 @@ const cors = require('cors');
 const multer = require('multer');
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
+// Core Node modules (hoisted to top to avoid TDZ when used by early middleware)
+const fs = require('fs');
+const path = require('path');
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -84,10 +88,8 @@ function generateSlug(title) {
 
 
 // =====================================================================
-// STATIC ASSETS
+// STATIC ASSETS (logo routes + buffers)
 // =====================================================================
-const fs = require('fs');
-const path = require('path');
 let logoBuffer = null;
 let logoFullBuffer = null;
 try { logoBuffer = fs.readFileSync(path.join(__dirname, 'logo.png')); } catch(e) { console.log('logo.png not found, using text fallback'); }
