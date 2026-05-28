@@ -63,6 +63,7 @@ function doLogin() {
       try { af3(); } catch (e) { console.error('af3', e); }
       try { af4(); } catch (e) { console.error('af4', e); }
       try { loadAnalytics(); } catch (e) { console.error('analytics', e); }
+      try { searchInstagram(); } catch (e) { console.error('instagram', e); }
     })
     .catch(function (e) {
       if (e && e.message === 'auth') toast('Wrong password!', 1);
@@ -103,4 +104,9 @@ function switchTab(t, el) {
   if (tabEl) tabEl.style.display = 'block';
 
   tab = t;
+
+  // Populate Instagram results when the tab becomes visible (in case it was empty)
+  if (t === 'instagram') {
+    try { searchInstagram(); } catch (e) {}
+  }
 }

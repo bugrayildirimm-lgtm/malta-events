@@ -101,7 +101,6 @@ function renderImagesTab() {
       <button class="fb" onclick="ssf('has',this)">Has images</button>
       <button class="fb" onclick="ssf('all',this)">All</button>
     </div>
-    <div class="cb" id="cb1">Loading...</div>
     <div class="events-grid" id="eg1"></div>
   `;
 }
@@ -135,7 +134,6 @@ function renderDatesTab() {
       <button class="fb" onclick="sdf('has',this)">Has date</button>
       <button class="fb" onclick="sdf('all',this)">All</button>
     </div>
-    <div class="cb" id="cb2">Loading...</div>
     <div class="events-grid" id="eg2"></div>
   `;
 }
@@ -153,7 +151,6 @@ function renderCategoriesTab() {
       <button class="fb active" onclick="scf('uncat',this)">Uncategorized</button>
       <button class="fb" onclick="scf('all',this)">All</button>
     </div>
-    <div class="cb" id="cb3">Loading...</div>
     <div class="events-grid" id="eg3"></div>
   `;
 }
@@ -169,7 +166,6 @@ function renderManageTab() {
         <option value="manual">Manual</option>
       </select>
     </div>
-    <div class="cb" id="cb4">Loading...</div>
     <div class="events-grid" id="eg4"></div>
   `;
 }
@@ -259,8 +255,23 @@ function renderAnalyticsTab() {
     <div class="analytics">
       <h3>Analytics</h3>
       <div class="stat-cards" id="statCards"></div>
-      <h3 style="margin:20px 0 10px">Recent Clicks</h3>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:30px;margin-top:20px">
+        <div>
+          <h3 style="margin:0 0 10px">Top Clicked Events</h3>
+          <table class="click-table" id="topTable"></table>
+        </div>
+        <div>
+          <h3 style="margin:0 0 10px">Clicks by Source</h3>
+          <table class="click-table" id="sourceTable"></table>
+        </div>
+      </div>
+
+      <h3 style="margin:30px 0 10px">Recent Clicks</h3>
       <table class="click-table" id="clickTable"></table>
+
+      <h3 style="margin:30px 0 10px">Email Subscribers <span id="subCount" style="color:#94a3b8;font-size:0.9rem;font-weight:400"></span></h3>
+      <div id="subscribersList" style="background:#1e293b;border:1px solid #334155;border-radius:12px;padding:15px;max-height:320px;overflow:auto"></div>
     </div>
   `;
 }
