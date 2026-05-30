@@ -110,7 +110,7 @@ function renderDatesTab() {
     <div class="fgt" onclick="document.getElementById('fgd').style.display = document.getElementById('fgd').style.display==='none' ? '' : 'none'">
       📖 Date format guide
     </div>
-    <div class="fg" id="fgd">
+    <div class="fg" id="fgd" style="display:block">
       <h3>Supported formats</h3>
       <table class="ft">
         <tr><td>14 Feb</td><td>Single date</td></tr>
@@ -253,7 +253,10 @@ function renderAnalyticsTab() {
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:30px;margin-top:20px">
         <div>
-          <h3 style="margin:0 0 10px;font-size:1.05rem">Top Clicked Events</h3>
+          <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px">
+            <h3 style="margin:0;font-size:1.05rem">Top Clicked Events</h3>
+            <input type="text" id="topSearch" placeholder="Filter events..." oninput="filterTopEvents()" style="flex:1; max-width:220px; padding:6px 10px; border-radius:6px; border:1px solid #334155; background:#0f172a; color:white; font-size:0.85rem;">
+          </div>
           <table class="click-table" id="topTable"></table>
         </div>
         <div>
@@ -262,13 +265,24 @@ function renderAnalyticsTab() {
         </div>
       </div>
 
-      <h3 style="margin:30px 0 10px;font-size:1.05rem">Email Subscribers <span id="subCount" style="color:#94a3b8;font-size:0.9rem;font-weight:400"></span></h3>
-      <div id="subscribersList" style="background:#1e293b;border:1px solid #334155;border-radius:12px;padding:15px;max-height:320px;overflow:auto"></div>
+      <div style="margin-top:30px">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px">
+          <h3 style="margin:0;font-size:1.05rem">Email Subscribers <span id="subCount" style="color:#94a3b8;font-size:0.9rem;font-weight:400"></span></h3>
+          <input type="text" id="subSearch" placeholder="Search subscribers..." oninput="filterSubscribers()" style="flex:1; max-width:260px; padding:6px 10px; border-radius:6px; border:1px solid #334155; background:#0f172a; color:white; font-size:0.85rem;">
+        </div>
+        <div id="subscribersList" style="background:#1e293b;border:1px solid #334155;border-radius:12px;padding:15px;max-height:320px;overflow:auto"></div>
+      </div>
 
       <div style="margin-top:40px;border-top:1px solid #334155;padding-top:25px">
         <h3 style="margin:0 0 12px;font-size:1.05rem">📧 Send Newsletter to Subscribers</h3>
+
+        <button onclick="autoGenerateNewsletter()" style="margin-bottom:12px;padding:10px 18px;background:#22c55e;color:white;border:none;border-radius:8px;cursor:pointer;font-weight:700">
+          ✨ Auto-generate This Week's Newsletter
+        </button>
+
         <input id="nlSubject" placeholder="Subject line" style="width:100%;padding:10px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:white;margin-bottom:8px">
         <textarea id="nlPreview" placeholder="Short preview text (appears in inbox)" style="width:100%;height:70px;padding:10px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:white;margin-bottom:8px"></textarea>
+
         <button onclick="sendNewsletter()" class="form-btn" style="width:auto;padding:10px 28px">Send to All Subscribers</button>
         <button onclick="previewNewsletter()" style="margin-left:10px;padding:10px 18px;background:#334155;color:white;border:none;border-radius:8px;cursor:pointer">Preview</button>
         <div id="nlResult" style="margin-top:10px;color:#94a3b8"></div>

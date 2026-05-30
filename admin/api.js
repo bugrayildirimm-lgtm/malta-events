@@ -37,18 +37,41 @@ module.exports = function createAdminApi(deps) {
       const subs = await pool.query('SELECT email FROM email_subscribers ORDER BY subscribed_at');
       if (!subs.rows.length) return res.json({ ok: false, error: 'No subscribers' });
 
-      const evResult = await pool.query("SELECT * FROM events WHERE COALESCE(status,'live')='live' ORDER BY id DESC LIMIT 200");
+      const evResult = await pool.query("SELECT * FROM events WHERE COALESCE(status,'live')='live' ORDER BY id DESC LIMIT 300");
       const now = new Date();
-      const upcoming = evResult.rows.filter(e => {
+
+      // Calculate this week (Monday to Sunday)
+      const day = now.getDay();
+      const diff = (day === 0 ? -6 : 1) - day; // days to Monday
+      const weekStart = new Date(now);
+      weekStart.setDate(now.getDate() + diff);
+      weekStart.setHours(0, 0, 0, 0);
+
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() + 6);
+      weekEnd.setHours(23, 59, 59, 999);
+
+      // Get "unique date" events for this week (exclude recurring/ongoing)
+      const weeklyUniqueEvents = evResult.rows.filter(e => {
+        if (e.recurring && e.recurring.trim()) return false; // skip ongoing/recurring
+
         const sd = dates.getStartDate(e.event_date);
-        return sd && sd >= now;
-      }).sort((a,b) => {
+        const ed = dates.getEndDate(e.event_date);
+
+        if (!sd) return false;
+        if (sd < weekStart || sd > weekEnd) return false;
+
+        // Skip very wide multi-day events (more than 4 days) as they are "continuous"
+        if (ed && (ed - sd) > (4 * 24 * 60 * 60 * 1000)) return false;
+
+        return true;
+      }).sort((a, b) => {
         const da = dates.getStartDate(a.event_date);
         const db = dates.getStartDate(b.event_date);
-        return (da||now) - (db||now);
-      }).slice(0, 8);
+        return (da || now) - (db || now);
+      }).slice(0, 12); // up to 12 good events for the week
 
-      const eventRows = upcoming.map(e => {
+      const eventRows = weeklyUniqueEvents.map(e => {
         const slug = e.slug || '';
         const img = e.image_url && e.image_url.startsWith('http') ? e.image_url : '';
         const cat = e.category || '';
@@ -104,7 +127,7 @@ module.exports = function createAdminApi(deps) {
         });
       }
 
-      res.json({ ok: true, sent: subs.rows.length });
+      res.json({ ok: true, sent: subs.rows.length, eventsIncluded: weeklyUniqueEvents.length });
     } catch (e) {
       console.error('Newsletter error:', e);
       res.json({ ok: false, error: e.message });
@@ -114,22 +137,42 @@ module.exports = function createAdminApi(deps) {
   router.get('/newsletter-preview', async (req, res) => {
     if (!authCheck(req, res)) return;
     try {
-      const evResult = await pool.query("SELECT * FROM events WHERE COALESCE(status,'live')='live' ORDER BY id DESC LIMIT 200");
+      const evResult = await pool.query("SELECT * FROM events WHERE COALESCE(status,'live')='live' ORDER BY id DESC LIMIT 300");
       const now = new Date();
-      const upcoming = evResult.rows.filter(e => {
+
+      // Same "this week unique events" logic as send-newsletter
+      const day = now.getDay();
+      const diff = (day === 0 ? -6 : 1) - day;
+      const weekStart = new Date(now);
+      weekStart.setDate(now.getDate() + diff);
+      weekStart.setHours(0, 0, 0, 0);
+
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() + 6);
+      weekEnd.setHours(23, 59, 59, 999);
+
+      const weeklyUniqueEvents = evResult.rows.filter(e => {
+        if (e.recurring && e.recurring.trim()) return false;
+
         const sd = dates.getStartDate(e.event_date);
-        return sd && sd >= now;
-      }).sort((a,b) => {
+        const ed = dates.getEndDate(e.event_date);
+
+        if (!sd) return false;
+        if (sd < weekStart || sd > weekEnd) return false;
+        if (ed && (ed - sd) > (4 * 24 * 60 * 60 * 1000)) return false;
+
+        return true;
+      }).sort((a, b) => {
         const da = dates.getStartDate(a.event_date);
         const db = dates.getStartDate(b.event_date);
-        return (da||now) - (db||now);
-      }).slice(0, 8);
+        return (da || now) - (db || now);
+      }).slice(0, 12);
 
       const subs = await pool.query('SELECT COUNT(*) as c FROM email_subscribers');
 
       res.json({
         subscribers: subs.rows[0].c,
-        events: upcoming.map(e => ({
+        events: weeklyUniqueEvents.map(e => ({
           title: e.title,
           date: e.event_date,
           location: e.location,
