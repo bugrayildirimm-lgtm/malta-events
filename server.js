@@ -1308,12 +1308,34 @@ app.get('/event/:slug', async (req, res) => {
     .cta:hover { background:var(--primary); transform:translateY(-2px); box-shadow:0 8px 25px rgba(255,56,92,0.3); }
 
     .share-row { display:flex; gap:8px; margin-top:12px; }
-    .share-btn { flex:1; padding:10px; border-radius:10px; text-align:center; font-size:0.8rem; font-weight:600; color:white; cursor:pointer; transition:opacity 0.2s; }
-    .share-btn:hover { opacity:0.85; }
-    .share-whatsapp { background:#25D366; }
-    .share-facebook { background:#1877F2; }
-    .share-copy { background:#64748b; }
-    .share-calendar { background:#0f172a; }
+    .share-btn { 
+      flex:1; 
+      padding:11px 12px; 
+      border-radius:10px; 
+      text-align:center; 
+      font-size:0.82rem; 
+      font-weight:600; 
+      color:#1e293b; 
+      background:#f1f5f9; 
+      border:1px solid #e2e8f0;
+      cursor:pointer; 
+      transition:all 0.2s; 
+    }
+    .share-btn:hover { 
+      background:#e2e8f0; 
+      border-color:#cbd5e1; 
+      transform: translateY(-1px);
+    }
+    .share-whatsapp { background:#dcfce7; border-color:#86efac; color:#166534; }
+    .share-facebook { background:#dbeafe; border-color:#93c5fd; color:#1e40af; }
+    .share-copy { background:#f1f5f9; }
+    .share-calendar { background:#f1f5f9; }
+
+    /* Make top nav more visible on event pages */
+    body > div[style*="position:absolute;top:0;left:0;right:0;padding:18px"] {
+      background: rgba(255,255,255,0.95);
+      backdrop-filter: blur(8px);
+    }
 
 
 
@@ -1366,7 +1388,7 @@ app.get('/event/:slug', async (req, res) => {
           + '</div>' : ''}
         ${externalUrl ? '<a href="' + externalUrl + '" target="_blank" class="cta" onclick="fetch(\'/api/track\',{method:\'POST\',headers:{\'Content-Type\':\'application/json\'},body:JSON.stringify({event_id:' + event.id + ',event_title:\'' + title.replace(/'/g, "\\'") + '\',source:\'' + source + '\'})})">View Event / Get Tickets →</a>' : '<a href="/" class="cta">← Browse More Events</a>'}
         <div class="share-row">
-          <div class="share-btn share-calendar" onclick="addToCalendar()">📅 Add to Calendar</div>
+          <div class="share-btn share-calendar" onclick="addToCalendar()">Add to Calendar</div>
           <div class="share-btn share-whatsapp" onclick="window.open('https://wa.me/?text='+encodeURIComponent('${title.replace(/'/g, "\\'")} - https://maltaeventguide.com/event/${slug}'))">WhatsApp</div>
           <div class="share-btn share-facebook" onclick="window.open('https://www.facebook.com/sharer/sharer.php?u='+encodeURIComponent('https://maltaeventguide.com/event/${slug}'))">Facebook</div>
           <div class="share-btn share-copy" onclick="navigator.clipboard.writeText('https://maltaeventguide.com/event/${slug}');this.textContent='Copied!'">Copy Link</div>
