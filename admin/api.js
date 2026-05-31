@@ -134,9 +134,13 @@ module.exports = function createAdminApi(deps) {
     }
   });
 
-  router.get('/newsletter-preview', async (req, res) => {
+  // Support both GET (simple) and POST (with subject/previewText) for flexibility
+  router.all('/newsletter-preview', async (req, res) => {
     if (!authCheck(req, res)) return;
     try {
+      const subject = (req.method === 'POST' ? req.body.subject : req.query.subject) || '';
+      const previewText = (req.method === 'POST' ? req.body.previewText : req.query.previewText) || '';
+
       const evResult = await pool.query("SELECT * FROM events WHERE COALESCE(status,'live')='live' ORDER BY id DESC LIMIT 300");
       const now = new Date();
 
@@ -168,20 +172,47 @@ module.exports = function createAdminApi(deps) {
         return (da || now) - (db || now);
       }).slice(0, 12);
 
-      const subs = await pool.query('SELECT COUNT(*) as c FROM email_subscribers');
+      // Build the same nice HTML email as the send route for live preview
+      const eventRows = weeklyUniqueEvents.map(e => {
+        const slug = e.slug || '';
+        const img = e.image_url && e.image_url.startsWith('http') ? e.image_url : '';
+        const cat = e.category || '';
+        return '<tr><td style="padding:12px 0;border-bottom:1px solid #e2e8f0">'
+          + '<table width="100%" cellpadding="0" cellspacing="0"><tr>'
+          + (img ? '<td width="80" style="padding-right:14px;vertical-align:top"><img src="' + img + '" width="80" height="80" style="border-radius:10px;object-fit:cover;display:block" alt=""></td>' : '')
+          + '<td style="vertical-align:top">'
+          + '<a href="https://maltaeventguide.com/event/' + slug + '" style="color:#0f172a;font-weight:700;font-size:15px;text-decoration:none;line-height:1.3">' + (e.title||'') + '</a><br>'
+          + '<span style="color:#64748b;font-size:13px">📅 ' + (e.event_date||'') + '</span><br>'
+          + '<span style="color:#64748b;font-size:13px">📍 ' + (e.location||'Malta') + '</span>'
+          + (cat ? '<br><span style="color:#94a3b8;font-size:12px">' + cat + '</span>' : '')
+          + '</td></tr></table></td></tr>';
+      }).join('');
 
-      res.json({
-        subscribers: subs.rows[0].c,
-        events: weeklyUniqueEvents.map(e => ({
-          title: e.title,
-          date: e.event_date,
-          location: e.location,
-          category: e.category,
-          image: e.image_url
-        }))
-      });
+      const emailHtml = '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale:1"></head>'
+        + '<body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,Helvetica,sans-serif">'
+        + '<table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:20px 0"><tr><td align="center">'
+        + '<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%">'
+        + '<tr><td style="background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 50%,#FF385C 100%);padding:30px 30px;border-radius:16px 16px 0 0;text-align:center">'
+        + '<img src="https://maltaeventguide.com/logo.png" height="45" alt="Malta Event Guide" style="margin-bottom:10px"><br>'
+        + '<span style="color:white;font-size:22px;font-weight:700">This Week in Malta</span><br>'
+        + '<span style="color:rgba(255,255,255,0.7);font-size:14px">' + (previewText || 'The best unique events happening this week') + '</span>'
+        + '</td></tr>'
+        + '<tr><td style="background:white;padding:28px 30px">'
+        + '<table width="100%" cellpadding="0" cellspacing="0">' + eventRows + '</table>'
+        + '</td></tr>'
+        + '<tr><td style="background:white;padding:0 30px 28px;text-align:center">'
+        + '<a href="https://maltaeventguide.com/" style="display:inline-block;background:#FF385C;color:white;padding:14px 36px;border-radius:12px;text-decoration:none;font-weight:700;font-size:15px">Browse All Events →</a>'
+        + '</td></tr>'
+        + '<tr><td style="background:#f8fafc;padding:20px 30px;border-radius:0 0 16px 16px;text-align:center;font-size:12px;color:#94a3b8">'
+        + 'Preview only — this email was not sent.<br>'
+        + '<a href="https://maltaeventguide.com" style="color:#94a3b8">maltaeventguide.com</a>'
+        + '</td></tr>'
+        + '</table></td></tr></table></body></html>';
+
+      res.set('Content-Type', 'text/html');
+      res.send(emailHtml);
     } catch (e) {
-      res.json({ events: [], subscribers: 0 });
+      res.status(500).send('Failed to generate preview: ' + e.message);
     }
   });
 
