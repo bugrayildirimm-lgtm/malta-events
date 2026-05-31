@@ -384,7 +384,7 @@ Object.entries(categoryPages).forEach(([slug, config]) => {
 // =====================================================================
 const guidePages = {
   'guide/how-to-find-events-in-malta': {
-    title: 'How to Find Events in Malta Easily — Complete Guide 2026',
+    title: 'How to Find Events in Malta Easily — Best Guide 2025/2026',
     h1: 'How to Find Events in Malta Easily',
     desc: 'A practical guide to discovering concerts, festivals, nightlife and things to do across the Maltese islands. Tips for tourists and locals alike.',
     content: `
@@ -410,11 +410,15 @@ const guidePages = {
     `
   },
   'guide/malta-nightlife-guide': {
-    title: 'Malta Nightlife Guide 2026 — Best Clubs, Bars & Party Areas',
-    h1: 'Malta Nightlife Guide 2026',
+    title: 'Malta Nightlife Guide 2025/2026 — Best Clubs, Bars & Parties',
+    h1: 'Malta Nightlife Guide',
     desc: 'Everything you need to know about nightlife in Malta. Best clubs in Paceville, rooftop bars in Valletta, boat parties, and tips for going out in Malta.',
     content: `
-      <p>Malta punches well above its weight when it comes to nightlife. For a small island, it has an impressive density of clubs, bars, beach clubs, and seasonal festivals that attract both locals and international visitors. Here is your complete guide to going out in Malta in 2026.</p>
+      <p>Malta punches well above its weight when it comes to nightlife. For a small island, it has an impressive density of clubs, bars, beach clubs, and seasonal festivals that attract both locals and international visitors. Here is your complete guide to going out in Malta.</p>
+
+      <div style="background:#f1f5f9;padding:16px 20px;border-radius:12px;margin:20px 0;font-size:0.95rem;">
+        <strong>Big events right now:</strong> Don’t miss <a href="/event/scorpions-live-in-concert-4792">Scorpions live in Malta</a> and the annual <a href="/festivals-malta">Isle of MTV</a> free concert in Floriana — two of the biggest highlights of the season.
+      </div>
 
       <h2>Paceville — The Nightlife Centre</h2>
       <p>Paceville in St Julian's is the undisputed heart of Malta's nightlife. Within a few compact streets you will find dozens of bars and clubs open every night of the week. Entry is usually free or cheap, and drinks are affordable compared to most European cities. Popular venues include Havana, Hugo's, and the various bars along Dragonara Road. Paceville gets busy from around 11pm and goes until 4am or later on weekends.</p>
@@ -429,10 +433,10 @@ const guidePages = {
       <p>Gianpula Village in Rabat is Malta's premier open-air club complex, hosting international DJs and multi-room events throughout summer. UNO Club on the same road is another major venue. For larger festivals, events are often held at MFCC Ta' Qali or the Granaries in Floriana.</p>
 
       <h2>Major Festivals Worth Planning Around</h2>
-      <p>Malta's festival scene goes well beyond club nights. <a href="/event/earth-garden-festival-2026-3564">Earth Garden</a> (May) is the island's biggest alternative festival with five stages at Ta' Qali National Park — world music, techno, reggae, and psytrance across three days with 30,000 attendees. Bloom Festival brings international house and techno to outdoor venues. Glitch Festival and Lost & Found have made Malta a serious electronic music destination. The Isle of MTV (summer) is completely free, drawing tens of thousands to Floriana for global pop and dance acts. Check our <a href="/festivals-malta">Festivals page</a> for all upcoming dates.</p>
+      <p>Malta's festival scene is one of the highlights of the summer. <a href="/event/earth-garden-festival-2026-3564">Earth Garden</a> at Ta' Qali is the island’s biggest multi-genre festival. Other strong options include Bloom Festival, Glitch Festival, and various village festas. The Isle of MTV concert in Floriana is one of the biggest free events of the year. Check our <a href="/festivals-malta">Festivals page</a> for the current schedule.</p>
 
-      <h2>Big Concerts in Malta 2026</h2>
-      <p>Malta is attracting major international artists. <a href="/event/scorpions-live-in-concert-4792">Scorpions</a> are bringing their legendary rock show to the island. <a href="/event/pitbull-im-back-with-special-guest-lil-jon-2486">Pitbull with special guest Lil Jon</a> is performing as part of his "I'm Back" tour. Bonnie Tyler, Kim Wilde, James Morrison, and Gabriel Iglesias have also performed or are coming to Malta. Browse our <a href="/music-events-malta">Music Events page</a> for all upcoming concerts.</p>
+      <h2>Big Concerts in Malta</h2>
+      <p>Malta regularly hosts major international artists. Recent and upcoming highlights include <a href="/event/scorpions-live-in-concert-4792">Scorpions</a>, <a href="/event/pitbull-im-back-with-special-guest-lil-jon-2486">Pitbull</a>, and many more. The Isle of MTV concert in Floriana is one of the biggest free events of the summer. Browse our <a href="/music-events-malta">Music Events page</a> for the full current lineup.</p>
 
       <h2>Summer Nightlife — Pool Parties, Boat Parties & Beach Clubs</h2>
       <p>From June to September, Malta's nightlife moves outdoors. Cafe del Mar, Bora Bora, and MedAsia Playa host pool parties and daytime DJ events. Boat parties run from Sliema and Bugibba with sunset cruises and live DJs. Gianpula Village and UNO in Rabat host open-air club nights with international headliners throughout summer.</p>
@@ -444,11 +448,15 @@ const guidePages = {
     `
   },
   'guide/things-to-do-malta-tourists': {
-    title: 'Things to Do in Malta for Tourists — Best Events & Activities 2026',
+    title: 'Things to Do in Malta for Tourists 2025/2026 — Events & Activities Guide',
     h1: 'Things to Do in Malta for Tourists',
     desc: 'Planning a trip to Malta? Here are the best events, activities, and experiences for visitors. From historical sites and festivals to beach clubs and food tours.',
     content: `
       <p>Malta is one of the Mediterranean's most underrated destinations. With over 7,000 years of history, stunning coastline, a thriving food scene, and year-round sunshine, there is something for every type of traveller. Here are the best things to do during your visit.</p>
+
+      <div style="background:#f1f5f9;padding:16px 20px;border-radius:12px;margin:20px 0;font-size:0.95rem;">
+        <strong>Don’t miss this season:</strong> <a href="/event/scorpions-live-in-concert-4792">Scorpions</a> live in Malta and the massive free <a href="/festivals-malta">Isle of MTV</a> concert in Floriana are two of the biggest events of the year.
+      </div>
 
       <h2>Must-See Cultural Events</h2>
       <p>Malta's cultural calendar is rich. The Valletta Baroque Festival (January) brings world-class classical music to historic venues. Carnival (February) fills the streets of Valletta with colourful floats and masked parades. Holy Week (March/April) features solemn processions that are deeply atmospheric. In October, Notte Bianca opens Valletta's palaces, museums, and churches for free with live performances until late. Check our <a href="/arts-culture-malta">Arts & Culture page</a> for current listings.</p>
@@ -456,8 +464,8 @@ const guidePages = {
       <h2>Summer Festivals & Outdoor Events</h2>
       <p>If you visit between June and September, you will find Malta at its most vibrant. The Isle of MTV is a free open-air concert in Floriana featuring major international artists. <a href="/event/earth-garden-festival-2026-3564">Earth Garden</a> is Malta's largest alternative festival, held at Ta' Qali National Park with five stages covering world music, reggae, techno, and psytrance — attracting 30,000 people over three days. Bloom Festival brings house and techno to outdoor venues. Beach clubs like Cafe del Mar, Bora Bora, and MedAsia Playa host pool parties and DJ events every weekend. Boat parties run from Sliema with sunset cruises and live DJs. Village festas happen every weekend across different towns with fireworks, brass bands, and street food — completely free and unmissable.</p>
 
-      <h2>Big Concerts in Malta 2026</h2>
-      <p>Malta is becoming a serious stop for world-touring artists. <a href="/event/scorpions-live-in-concert-4792">Scorpions</a> are performing live in Malta. <a href="/event/pitbull-im-back-with-special-guest-lil-jon-2486">Pitbull with Lil Jon</a> is coming as part of his "I'm Back" world tour. Bonnie Tyler, Kim Wilde, James Morrison, and Gabriel Iglesias have also performed or are scheduled in Malta this year. Check our <a href="/music-events-malta">Music Events page</a> for the full concert calendar.</p>
+      <h2>Big Concerts in Malta</h2>
+      <p>Malta regularly attracts major international artists. Highlights have included <a href="/event/scorpions-live-in-concert-4792">Scorpions</a> and many others. The annual Isle of MTV free concert in Floriana is one of the summer’s biggest events. Check our <a href="/music-events-malta">Music Events page</a> for the current lineup.</p>
 
       <h2>Food & Drink Experiences</h2>
       <p>Malta's food scene has exploded in recent years. Look out for food festivals, wine tastings at local vineyards (Marsovin and Meridiana are the main producers), and the annual Frawli Festival (Strawberry Festival) in Mgarr. For everyday eating, try pastizzi (flaky pastries with ricotta or pea filling) from any village bakery — they cost less than a euro. Browse our <a href="/food-drink-events-malta">Food & Drink Events page</a> for upcoming tastings and festivals.</p>
@@ -493,6 +501,7 @@ Object.entries(guidePages).forEach(([slug, config]) => {
   <meta property="og:description" content="${config.desc}">
   <meta property="og:url" content="https://maltaeventguide.com/${slug}">
   <meta property="og:type" content="article">
+  <meta property="og:image" content="https://maltaeventguide.com/logo.png">
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -501,8 +510,8 @@ Object.entries(guidePages).forEach(([slug, config]) => {
     "description": "${config.desc}",
     "url": "https://maltaeventguide.com/${slug}",
     "publisher": { "@type": "Organization", "name": "Malta Event Guide", "url": "https://maltaeventguide.com", "logo": { "@type": "ImageObject", "url": "https://maltaeventguide.com/logo.png" } },
-    "datePublished": "2026-03-01",
-    "dateModified": "2026-03-07",
+    "datePublished": "2025-01-01",
+    "dateModified": "${new Date().toISOString().split('T')[0]}",
     "author": { "@type": "Organization", "name": "Malta Event Guide" }
   }
   </script>
@@ -1310,32 +1319,67 @@ app.get('/event/:slug', async (req, res) => {
     .ig-embed { margin:18px 0; border-radius:12px; overflow:hidden; max-width:400px; }
     .ig-embed iframe { width:100%; border:0; border-radius:12px; height:720px; }
 
-    .cta { display:block; width:100%; padding:16px; background:#0f172a; color:white; text-align:center; border-radius:12px; font-weight:800; font-size:1.05rem; transition:0.3s; box-sizing:border-box; }
-    .cta:hover { background:var(--primary); transform:translateY(-2px); box-shadow:0 8px 25px rgba(255,56,92,0.3); }
+    .cta { 
+      display:block; 
+      width:100%; 
+      padding:15px 20px; 
+      background:#0f172a; 
+      color:white; 
+      text-align:center; 
+      border-radius:12px; 
+      font-weight:700; 
+      font-size:1rem; 
+      letter-spacing:0.3px;
+      transition:all 0.2s ease; 
+      box-sizing:border-box; 
+      border:1px solid #0f172a;
+    }
+    .cta:hover { 
+      background:#1e293b; 
+      border-color:#1e293b;
+      transform:translateY(-1px); 
+      box-shadow:0 6px 16px rgba(15,23,42,0.25); 
+    }
 
     .share-row { display:flex; gap:8px; margin-top:12px; }
     .share-btn { 
       flex:1; 
-      padding:11px 12px; 
+      padding:12px 14px; 
       border-radius:10px; 
       text-align:center; 
-      font-size:0.82rem; 
+      font-size:0.85rem; 
       font-weight:600; 
-      color:#1e293b; 
-      background:#f1f5f9; 
+      color:#334155; 
+      background:white; 
       border:1px solid #e2e8f0;
       cursor:pointer; 
-      transition:all 0.2s; 
+      transition:all 0.2s ease; 
+      box-shadow: 0 1px 2px rgba(0,0,0,0.03);
     }
     .share-btn:hover { 
-      background:#e2e8f0; 
+      background:#f8fafc; 
       border-color:#cbd5e1; 
+      color:#1e293b;
       transform: translateY(-1px);
+      box-shadow: 0 4px 6px rgba(0,0,0,0.05);
     }
-    .share-whatsapp { background:#dcfce7; border-color:#86efac; color:#166534; }
-    .share-facebook { background:#dbeafe; border-color:#93c5fd; color:#1e40af; }
-    .share-copy { background:#f1f5f9; }
-    .share-calendar { background:#f1f5f9; }
+    .share-whatsapp { 
+      color:#166534; 
+      border-color:#86efac; 
+    }
+    .share-whatsapp:hover {
+      background:#f0fdf4;
+    }
+    .share-facebook { 
+      color:#1e40af; 
+      border-color:#93c5fd; 
+    }
+    .share-facebook:hover {
+      background:#eff6ff;
+    }
+    .share-copy, .share-calendar { 
+      color:#475569; 
+    }
 
     /* Make top nav more visible on event pages */
     body > div[style*="position:absolute;top:0;left:0;right:0;padding:18px"] {
