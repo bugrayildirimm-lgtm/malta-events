@@ -142,19 +142,27 @@ function selectAllVisible() {
 function normalizeForSimilarity(title) {
   if (!title) return '';
   let t = title.toLowerCase();
+
   // Remove accents
   t = t.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
   // Remove punctuation and symbols
   t = t.replace(/[^\w\s]/g, ' ');
-  // Remove common filler words that scrapers add differently
+
+  // Remove common performer/filler phrases that differ between sources
   const fillers = [
-    'live in concert', 'live', 'concert', 'tour', 'show', 'event', 
-    'official', 'di', 'del', 'della', 'la', 'il', 'un', 'una', 'the', 'a', 'an'
+    'live in concert', 'live', 'concert', 'tour', 'show', 'event',
+    'official', 'di', 'del', 'della', 'la', 'il', 'un', 'una', 'the', 'a', 'an',
+    'featuring', 'feat\\.?', 'ft\\.?', 'with', 'starring', 'presents', 'presenting'
   ];
   fillers.forEach(word => {
     const regex = new RegExp(`\\b${word}\\b`, 'gi');
     t = t.replace(regex, '');
   });
+
+  // Remove common trailing patterns like "Live In Concert", artist names after "featuring", etc.
+  t = t.replace(/\s+(live|concert|tour|featuring|feat\.?)\s+.*$/i, '');
+
   return t.replace(/\s+/g, ' ').trim();
 }
 
@@ -176,8 +184,29 @@ function titleSimilarity(titleA, titleB) {
   return intersection / union;
 }
 
+// Stronger combined similarity using title + location + date
+function areEventsLikelyDuplicates(e1, e2) {
+  const titleSim = titleSimilarity(e1.title, e2.title);
+
+  // Normalize locations
+  const loc1 = (e1.location || '').toLowerCase().replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  const loc2 = (e2.location || '').toLowerCase().replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim();
+
+  const sameLocation = loc1 && loc2 && (loc1 === loc2 || loc1.includes(loc2) || loc2.includes(loc1));
+
+  // Date match
+  const sameDate = e1.event_date && e2.event_date && e1.event_date === e2.event_date;
+
+  let score = titleSim;
+
+  if (sameLocation) score += 0.22;
+  if (sameDate) score += 0.18;
+
+  return score;
+}
+
 function reviewDuplicates() {
-  const SIMILARITY_THRESHOLD = 0.68; // Lowered because we now include date proximity bonus
+  const SIMILARITY_THRESHOLD = 0.65; // Using combined title + location + date similarity
 
   const events = E.filter(e => e.title && e.title.length > 3);
   const used = new Set();
@@ -192,26 +221,16 @@ function reviewDuplicates() {
     for (let j = i + 1; j < events.length; j++) {
       if (used.has(events[j].id)) continue;
 
-      const sim = titleSimilarity(events[i].title, events[j].title);
+      const combinedScore = areEventsLikelyDuplicates(events[i], events[j]);
 
-      // Also consider very high overlap even if below threshold
-      // Date proximity bonus (very important for duplicate detection)
-      let dateBonus = 0;
-      const dateI = events[i].event_date;
-      const dateJ = events[j].event_date;
-      if (dateI && dateJ && dateI === dateJ) {
-        dateBonus = 0.25;
-      }
-
-      const finalScore = sim + dateBonus;
-      const highOverlap = finalScore >= SIMILARITY_THRESHOLD;
+      const highOverlap = combinedScore >= SIMILARITY_THRESHOLD;
 
       if (highOverlap) {
         // Only group if they are from different sources or very high similarity
         const sourceI = events[i].source_name || 'Unknown';
         const sourceJ = events[j].source_name || 'Unknown';
 
-        if (sourceI !== sourceJ || finalScore > 0.9) {
+        if (sourceI !== sourceJ || combinedScore > 0.9) {
           group.push(events[j]);
           used.add(events[j].id);
         }
@@ -253,10 +272,11 @@ function reviewDuplicates() {
     group.forEach(e => {
       const source = e.source_name || 'Unknown';
       const date = e.event_date || 'No date';
+      const venue = e.location ? ` — ${e.location}` : '';
       html += `
         <div style="display:flex;justify-content:space-between;align-items:center;background:#0f172a;padding:10px;border-radius:6px;margin-bottom:6px">
           <div>
-            <div style="font-size:0.9rem">${source} — ${date}</div>
+            <div style="font-size:0.9rem">${source} — ${date}${venue}</div>
             <div style="font-size:0.75rem;color:#64748b">ID: ${e.id}</div>
           </div>
           <button onclick="keepOneAndDeleteRest(${e.id}, [${group.map(x => x.id).join(',')}], this)" 
