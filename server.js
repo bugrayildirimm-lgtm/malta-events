@@ -154,17 +154,23 @@ function getNavHTML(options = {}) {
     backLink = false,
     backText = '← All Events',
     logoHeight = 50,
-    showSocials = true
+    showSocials = true,
+    darkNav = false   // false = light background (for event/category pages), true = dark (for special cases)
   } = options;
 
   const backHTML = backLink
     ? `<a href="/" class="back" style="color:#94a3b8;font-size:0.85rem;margin-left:auto;">${backText}</a>`
     : '';
 
-  const socials = showSocials ? getSocialIconsHTML('light') : '';
+  const navBg = darkNav 
+    ? 'background:rgba(15,23,42,0.92);backdrop-filter:blur(10px);' 
+    : 'background:rgba(255,255,255,0.96);backdrop-filter:blur(10px);box-shadow:0 1px 0 rgba(0,0,0,0.04);';
+
+  const socialVariant = darkNav ? 'light' : 'dark';
+  const socials = showSocials ? getSocialIconsHTML(socialVariant) : '';
 
   return `
-  <div style="position:absolute;top:0;left:0;right:0;padding:18px 24px;display:flex;align-items:center;justify-content:space-between;z-index:3">
+  <div style="position:absolute;top:0;left:0;right:0;padding:18px 24px;display:flex;align-items:center;justify-content:space-between;z-index:3;${navBg}">
     <a href="/" style="text-decoration:none">
       <img src="/logo.png" alt="Malta Event Guide" style="height:${logoHeight}px">
     </a>
