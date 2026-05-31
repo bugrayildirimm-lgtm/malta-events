@@ -2,13 +2,22 @@
  * Categories Tab
  */
 
+var sf3v = 'uncat';   // 'uncat' or 'all'
+
 function af3() {
   var q = (document.getElementById('sf3') ? document.getElementById('sf3').value : '').toLowerCase();
   var src = document.getElementById('ss3') ? document.getElementById('ss3').value : 'all';
 
   var f = E.filter(function (e) {
     if (src !== 'all' && !((e.source_name || '').toLowerCase().includes(src))) return false;
-    return !e.category && ((e.title || '').toLowerCase().includes(q) || (e.location || '').toLowerCase().includes(q));
+
+    var matchSearch = (e.title || '').toLowerCase().includes(q) || (e.location || '').toLowerCase().includes(q);
+
+    if (sf3v === 'uncat') {
+      return !e.category && matchSearch;
+    } else {
+      return matchSearch;   // show all events when "All" is selected
+    }
   }).slice(0, 80);
 
   var h = '';
@@ -26,6 +35,7 @@ function af3() {
 function scf(m, el) {
   document.querySelectorAll('#categoriesTab .fb').forEach(function (x) { x.classList.remove('active'); });
   if (el) el.classList.add('active');
+  sf3v = m;
   af3();
 }
 

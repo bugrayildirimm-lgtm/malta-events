@@ -253,9 +253,12 @@ function renderAnalyticsTab() {
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:30px;margin-top:20px">
         <div>
-          <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px">
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px; flex-wrap:wrap">
             <h3 style="margin:0;font-size:1.05rem">Top Clicked Events</h3>
-            <input type="text" id="topSearch" placeholder="Filter events..." oninput="filterTopEvents()" style="flex:1; max-width:220px; padding:6px 10px; border-radius:6px; border:1px solid #334155; background:#0f172a; color:white; font-size:0.85rem;">
+            <input type="text" id="topSearch" placeholder="Search title..." oninput="filterTopEvents()" style="max-width:160px; padding:6px 10px; border-radius:6px; border:1px solid #334155; background:#0f172a; color:white; font-size:0.85rem;">
+            <select id="topSourceFilter" onchange="filterTopEvents()" style="max-width:140px; padding:6px 8px; border-radius:6px; border:1px solid #334155; background:#0f172a; color:white; font-size:0.85rem;">
+              <option value="">All Sources</option>
+            </select>
           </div>
           <table class="click-table" id="topTable"></table>
         </div>
