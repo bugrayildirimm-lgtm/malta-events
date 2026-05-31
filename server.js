@@ -635,13 +635,18 @@ app.get('/', async (req, res) => {
         const isRecurring = !!(event.recurring && event.recurring.trim());
         
         if (isRecurring && !startDate && !endDate) {
-          // Recurring with no date — it's ongoing, sort to today
-          upcoming.push({ ...event, _sort: new Date(today), _isRecurring: true });
+          // Recurring with no date — push it a bit further down so single-date events surface higher
+          const recurringSort = new Date(today);
+          recurringSort.setDate(recurringSort.getDate() + 3);
+          upcoming.push({ ...event, _sort: recurringSort, _isRecurring: true });
         } else if (!endDate || endDate >= today) {
           let sortDate = nextDate || startDate;
           if (sortDate && sortDate < today) sortDate = new Date(today);
-          // Recurring events that have a date range: sort to today if within range
-          if (isRecurring && !sortDate) sortDate = new Date(today);
+          // Recurring events that have a date range: give them a small penalty so they don't dominate the top
+          if (isRecurring && !sortDate) {
+            sortDate = new Date(today);
+            sortDate.setDate(sortDate.getDate() + 3);
+          }
           upcoming.push({ ...event, _sort: sortDate, _isRecurring: isRecurring });
         } else {
           past.push({ ...event, _sort: endDate });
