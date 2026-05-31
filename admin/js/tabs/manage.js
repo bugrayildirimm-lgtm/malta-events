@@ -137,22 +137,55 @@ function selectAllVisible() {
   alert("For best results, use the individual checkboxes. 'Select All' will be improved in next small update.");
 }
 
-// === Simple Duplicate Review (manual choice which version to keep) ===
+// === Improved Duplicate Review ===
+
+function normalizeTitleForDupes(title) {
+  if (!title) return '';
+  
+  let t = title.toLowerCase();
+  
+  // Remove accents
+  t = t.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  
+  // Remove common punctuation and symbols
+  t = t.replace(/[–—―−]/g, ' ');           // various dashes
+  t = t.replace(/[^\w\s]/g, ' ');           // remove most punctuation
+  
+  // Remove very common filler words that differ between sources
+  const fillers = ['live in concert', 'live', 'concert', 'tour', 'show', 'event', 'official'];
+  fillers.forEach(word => {
+    const regex = new RegExp(`\\b${word}\\b`, 'gi');
+    t = t.replace(regex, '');
+  });
+  
+  // Normalize whitespace
+  t = t.replace(/\s+/g, ' ').trim();
+  
+  return t;
+}
 
 function reviewDuplicates() {
-  // Group by normalized title
+  // Group by much smarter normalized title
   const groups = {};
+  
   E.forEach(e => {
-    const key = (e.title || '').toLowerCase().trim();
-    if (!key) return;
+    const key = normalizeTitleForDupes(e.title);
+    if (!key || key.length < 4) return;   // skip very short/empty titles
+    
     if (!groups[key]) groups[key] = [];
     groups[key].push(e);
   });
 
-  const duplicates = Object.values(groups).filter(g => g.length >= 2);
+  // Only keep groups that have events from different sources (more useful)
+  const duplicates = Object.values(groups).filter(group => {
+    if (group.length < 2) return false;
+    
+    const sources = new Set(group.map(e => e.source_name || 'Unknown'));
+    return sources.size >= 2;   // only show if they come from different sources
+  });
 
   if (duplicates.length === 0) {
-    toast('No obvious duplicates found right now.');
+    toast('No duplicates from different sources found right now.');
     return;
   }
 
@@ -162,14 +195,17 @@ function reviewDuplicates() {
   
   let html = `<div style="background:#1e293b;color:white;max-width:900px;width:100%;max-height:85vh;overflow:auto;border-radius:12px;padding:20px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-      <h3 style="margin:0">Review Duplicates (${duplicates.length} groups)</h3>
+      <h3 style="margin:0">Review Duplicates from Different Sources (${duplicates.length} groups)</h3>
       <button onclick="this.closest('.modal-wrapper').remove()" style="background:#334155;color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer">Close</button>
     </div>
-    <p style="color:#94a3b8;margin-bottom:16px">For each group, click "Keep This One" on the version you want to keep. The others will be deleted.</p>`;
+    <p style="color:#94a3b8;margin-bottom:16px">These events have very similar titles but come from different sources. Choose the best version to keep.</p>`;
 
   duplicates.forEach((group, groupIndex) => {
     html += `<div style="border:1px solid #334155;border-radius:8px;margin-bottom:20px;padding:12px">`;
-    html += `<div style="font-weight:600;margin-bottom:8px;color:#f1f5f9">Group ${groupIndex + 1} — ${group[0].title}</div>`;
+    
+    const sources = [...new Set(group.map(e => e.source_name || 'Unknown'))].join(' + ');
+    html += `<div style="font-weight:600;margin-bottom:8px;color:#f1f5f9">Group ${groupIndex + 1} — ${sources}</div>`;
+    html += `<div style="font-size:0.9rem;color:#cbd5e1;margin-bottom:10px">${group[0].title}</div>`;
     
     group.forEach(e => {
       const source = e.source_name || 'Unknown';
