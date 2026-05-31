@@ -155,7 +155,7 @@ function getNavHTML(options = {}) {
     backText = '← All Events',
     logoHeight = 50,
     showSocials = true,
-    darkNav = false   // false = light background (for event/category pages), true = dark (for special cases)
+    darkNav = true   // default to dark gradient like homepage header for logo visibility on light pages
   } = options;
 
   const backHTML = backLink
@@ -163,7 +163,7 @@ function getNavHTML(options = {}) {
     : '';
 
   const navBg = darkNav 
-    ? 'background:rgba(15,23,42,0.92);backdrop-filter:blur(10px);' 
+    ? 'background:linear-gradient(135deg, #0f172a 0%, #1e3a5f 40%, #FF385C 100%);' 
     : 'background:rgba(255,255,255,0.96);backdrop-filter:blur(10px);box-shadow:0 1px 0 rgba(0,0,0,0.04);';
 
   const socialVariant = darkNav ? 'light' : 'dark';
