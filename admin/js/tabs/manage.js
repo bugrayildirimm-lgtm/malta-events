@@ -139,53 +139,96 @@ function selectAllVisible() {
 
 // === Improved Duplicate Review ===
 
-function normalizeTitleForDupes(title) {
+function normalizeForSimilarity(title) {
   if (!title) return '';
-  
   let t = title.toLowerCase();
-  
   // Remove accents
   t = t.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  
-  // Remove common punctuation and symbols
-  t = t.replace(/[–—―−]/g, ' ');           // various dashes
-  t = t.replace(/[^\w\s]/g, ' ');           // remove most punctuation
-  
-  // Remove very common filler words that differ between sources
-  const fillers = ['live in concert', 'live', 'concert', 'tour', 'show', 'event', 'official'];
+  // Remove punctuation and symbols
+  t = t.replace(/[^\w\s]/g, ' ');
+  // Remove common filler words that scrapers add differently
+  const fillers = [
+    'live in concert', 'live', 'concert', 'tour', 'show', 'event', 
+    'official', 'di', 'del', 'della', 'la', 'il', 'un', 'una', 'the', 'a', 'an'
+  ];
   fillers.forEach(word => {
     const regex = new RegExp(`\\b${word}\\b`, 'gi');
     t = t.replace(regex, '');
   });
-  
-  // Normalize whitespace
-  t = t.replace(/\s+/g, ' ').trim();
-  
-  return t;
+  return t.replace(/\s+/g, ' ').trim();
+}
+
+function titleSimilarity(titleA, titleB) {
+  const a = normalizeForSimilarity(titleA).split(/\s+/).filter(Boolean);
+  const b = normalizeForSimilarity(titleB).split(/\s+/).filter(Boolean);
+
+  if (a.length === 0 || b.length === 0) return 0;
+
+  const setA = new Set(a);
+  const setB = new Set(b);
+
+  let intersection = 0;
+  for (let word of setA) {
+    if (setB.has(word)) intersection++;
+  }
+
+  const union = setA.size + setB.size - intersection;
+  return intersection / union;
 }
 
 function reviewDuplicates() {
-  // Group by much smarter normalized title
-  const groups = {};
-  
-  E.forEach(e => {
-    const key = normalizeTitleForDupes(e.title);
-    if (!key || key.length < 4) return;   // skip very short/empty titles
-    
-    if (!groups[key]) groups[key] = [];
-    groups[key].push(e);
-  });
+  const SIMILARITY_THRESHOLD = 0.68; // Lowered because we now include date proximity bonus
 
-  // Only keep groups that have events from different sources (more useful)
-  const duplicates = Object.values(groups).filter(group => {
-    if (group.length < 2) return false;
-    
-    const sources = new Set(group.map(e => e.source_name || 'Unknown'));
-    return sources.size >= 2;   // only show if they come from different sources
-  });
+  const events = E.filter(e => e.title && e.title.length > 3);
+  const used = new Set();
+  const duplicateGroups = [];
 
-  if (duplicates.length === 0) {
-    toast('No duplicates from different sources found right now.');
+  for (let i = 0; i < events.length; i++) {
+    if (used.has(events[i].id)) continue;
+
+    const group = [events[i]];
+    used.add(events[i].id);
+
+    for (let j = i + 1; j < events.length; j++) {
+      if (used.has(events[j].id)) continue;
+
+      const sim = titleSimilarity(events[i].title, events[j].title);
+
+      // Also consider very high overlap even if below threshold
+      // Date proximity bonus (very important for duplicate detection)
+      let dateBonus = 0;
+      const dateI = events[i].event_date;
+      const dateJ = events[j].event_date;
+      if (dateI && dateJ && dateI === dateJ) {
+        dateBonus = 0.25;
+      }
+
+      const finalScore = sim + dateBonus;
+      const highOverlap = finalScore >= SIMILARITY_THRESHOLD;
+
+      if (highOverlap) {
+        // Only group if they are from different sources or very high similarity
+        const sourceI = events[i].source_name || 'Unknown';
+        const sourceJ = events[j].source_name || 'Unknown';
+
+        if (sourceI !== sourceJ || finalScore > 0.9) {
+          group.push(events[j]);
+          used.add(events[j].id);
+        }
+      }
+    }
+
+    if (group.length >= 2) {
+      // Only keep groups that actually come from multiple sources
+      const uniqueSources = new Set(group.map(e => e.source_name || 'Unknown'));
+      if (uniqueSources.size >= 2) {
+        duplicateGroups.push(group);
+      }
+    }
+  }
+
+  if (duplicateGroups.length === 0) {
+    toast('No clear cross-source duplicates found with current sensitivity.');
     return;
   }
 
@@ -195,12 +238,12 @@ function reviewDuplicates() {
   
   let html = `<div style="background:#1e293b;color:white;max-width:900px;width:100%;max-height:85vh;overflow:auto;border-radius:12px;padding:20px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-      <h3 style="margin:0">Review Duplicates from Different Sources (${duplicates.length} groups)</h3>
+      <h3 style="margin:0">Review Duplicates from Different Sources (${duplicateGroups.length} groups)</h3>
       <button onclick="this.closest('.modal-wrapper').remove()" style="background:#334155;color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer">Close</button>
     </div>
     <p style="color:#94a3b8;margin-bottom:16px">These events have very similar titles but come from different sources. Choose the best version to keep.</p>`;
 
-  duplicates.forEach((group, groupIndex) => {
+  duplicateGroups.forEach((group, groupIndex) => {
     html += `<div style="border:1px solid #334155;border-radius:8px;margin-bottom:20px;padding:12px">`;
     
     const sources = [...new Set(group.map(e => e.source_name || 'Unknown'))].join(' + ');
