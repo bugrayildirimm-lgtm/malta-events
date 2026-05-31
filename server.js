@@ -979,8 +979,16 @@ app.get('/', async (req, res) => {
         
         if(mode==='today'){
           match = inRange(todayStr) || recurMatch(today);
+          // Extra safety for recurring
+          if (!match && recur) {
+            match = recurMatch(today);
+          }
         } else if(mode==='tomorrow'){
           match = inRange(tomorrowStr) || recurMatch(tomorrow);
+          // Extra safety: always check recurring for tomorrow as well
+          if (!match && recur) {
+            match = recurMatch(tomorrow);
+          }
         } else if(mode==='weekend'){
           // Weekend: show range events too (likely happening at some point)
           for(var w=0;w<weekendDates.length;w++){
