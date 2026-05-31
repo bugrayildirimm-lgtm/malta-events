@@ -442,6 +442,21 @@ module.exports = function createAdminApi(deps) {
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
 
+  // Batch delete (for checkboxes in Manage tab)
+  router.post('/events/batch-delete', async (req, res) => {
+    if (!authCheck(req, res)) return;
+    try {
+      const { ids } = req.body;
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return res.json({ success: false, error: 'No ids provided' });
+      }
+      await pool.query('DELETE FROM events WHERE id = ANY($1)', [ids]);
+      res.json({ success: true, deleted: ids.length });
+    } catch (e) { 
+      res.status(500).json({ error: e.message }); 
+    }
+  });
+
   router.put('/events/:id', async (req, res) => {
     if (!authCheck(req, res)) return;
     try {

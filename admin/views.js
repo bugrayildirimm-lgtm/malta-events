@@ -165,7 +165,9 @@ function renderManageTab() {
         <option value="visitmalta">VisitMalta</option>
         <option value="manual">Manual</option>
       </select>
-      <button onclick="removeDuplicates()" style="margin-left:auto;background:#ef4444;color:white;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-weight:700">🧹 Remove Duplicates</button>
+      <button onclick="removeDuplicates()" style="background:#ef4444;color:white;border:none;padding:8px 14px;border-radius:6px;cursor:pointer;font-weight:600">🧹 Auto Remove Duplicates</button>
+      <button onclick="selectAllVisible()" style="background:#334155;color:white;border:none;padding:8px 14px;border-radius:6px;cursor:pointer">Select All Visible</button>
+      <button onclick="reviewDuplicates()" style="background:#3b82f6;color:white;border:none;padding:8px 14px;border-radius:6px;cursor:pointer;font-weight:600">Review Duplicates</button>
     </div>
     <div class="events-grid" id="eg4"></div>
   `;
