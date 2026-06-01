@@ -170,7 +170,7 @@ function getNavHTML(options = {}) {
   const socials = showSocials ? getSocialIconsHTML(socialVariant) : '';
 
   return `
-  <div style="position:absolute;top:0;left:0;right:0;padding:18px 24px;display:flex;align-items:center;justify-content:space-between;z-index:3;${navBg}">
+  <div style="position:absolute;top:0;left:0;right:0;padding:10px 24px;display:flex;align-items:center;justify-content:space-between;z-index:3;${navBg}">
     <a href="/" style="text-decoration:none">
       <img src="/logo.png" alt="Malta Event Guide" style="height:${logoHeight}px">
     </a>
