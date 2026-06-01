@@ -1341,7 +1341,7 @@ app.get('/event/:slug', async (req, res) => {
       box-shadow:0 6px 16px rgba(15,23,42,0.25); 
     }
 
-    .share-row { display:flex; gap:8px; margin-top:12px; }
+    .share-row { display:flex; gap:8px; margin-top:28px; }
     .share-btn { 
       flex:1; 
       padding:12px 14px; 
@@ -1399,7 +1399,7 @@ app.get('/event/:slug', async (req, res) => {
       .event-details { padding:24px; }
       h1 { font-size:1.4rem; }
       .wrapper { margin-top:15px; }
-      .share-row { flex-wrap:wrap; }
+      .share-row { flex-wrap:wrap; margin-top:20px; }
       .share-btn { min-width:calc(50% - 6px); }
     }
   </style>

@@ -49,16 +49,18 @@ a {
 /* Buttons */
 .btn {
   margin-top: auto;
+  align-self: center;
   display: block;
-  width: 100%;
-  padding: 15px;
+  width: fit-content;
+  min-width: 160px;
+  padding: 14px 28px;
   background: #0f172a;
   color: white;
   text-align: center;
   text-decoration: none;
   border-radius: 12px;
   font-weight: 700;
-  font-size: 1rem;
+  font-size: 0.95rem;
   transition: 0.3s;
   box-shadow: 0 4px 12px rgba(15, 23, 42, 0.15);
 }
