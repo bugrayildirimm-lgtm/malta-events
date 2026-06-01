@@ -325,7 +325,7 @@ Object.entries(categoryPages).forEach(([slug, config]) => {
   <link rel="stylesheet" href="/styles.css">
   <style>
     /* Category page specific overrides. Most styles now in /styles.css */
-    .hero { max-width:900px; margin:30px auto; padding:0 20px; }
+    .hero { max-width:900px; margin:70px auto 30px; padding:0 20px; }
     .hero h1 { font-size:2rem; margin:0 0 10px; }
     .hero p { color:#64748b; font-size:1rem; line-height:1.6; margin:0 0 25px; }
     .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:18px; max-width:900px; margin:0 auto; padding:0 20px 50px; }
@@ -530,7 +530,7 @@ Object.entries(guidePages).forEach(([slug, config]) => {
 </head>
 <body>
   ${getNavHTML({ backLink: true, backText: '&larr; All Events' })}
-  <article>
+  <article style="margin-top:70px;">
     <h1>${config.h1}</h1>
     <div class="byline">Updated March 2026 &middot; Malta Event Guide</div>
     ${config.content}
@@ -1289,7 +1289,7 @@ app.get('/event/:slug', async (req, res) => {
   <link rel="stylesheet" href="/styles.css">
   <style>
     /* Event-specific styles. Common rules moved to /styles.css */
-    .wrapper { max-width:960px; margin:30px auto; padding:0 20px 40px; }
+    .wrapper { max-width:960px; margin:85px auto 30px; padding:0 20px 40px; }
 
     .event-layout { display:grid; grid-template-columns:420px 1fr; gap:0; background:white; border-radius:20px; overflow:hidden; box-shadow:0 4px 24px rgba(0,0,0,0.08); align-items:start; }
 
@@ -1398,7 +1398,7 @@ app.get('/event/:slug', async (req, res) => {
       .event-img img { min-height:auto; object-fit:contain; max-height:450px; background:#f1f5f9; }
       .event-details { padding:24px; }
       h1 { font-size:1.4rem; }
-      .wrapper { margin-top:15px; }
+      .wrapper { margin-top:65px; }
       .share-row { flex-wrap:wrap; margin-top:20px; }
       .share-btn { min-width:calc(50% - 6px); }
     }
