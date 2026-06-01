@@ -163,7 +163,7 @@ function getNavHTML(options = {}) {
     : '';
 
   const navBg = darkNav 
-    ? 'background:linear-gradient(135deg, #0f172a 0%, #1e3a5f 40%, #FF385C 100%);' 
+    ? 'background:rgba(15,23,42,0.75);backdrop-filter:blur(14px);' 
     : 'background:rgba(255,255,255,0.96);backdrop-filter:blur(10px);box-shadow:0 1px 0 rgba(0,0,0,0.04);';
 
   const socialVariant = darkNav ? 'light' : 'dark';
