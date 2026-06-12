@@ -139,75 +139,55 @@ function selectAllVisible() {
 
 // === Improved Duplicate Review ===
 
-function normalizeForSimilarity(title) {
+function getCoreTitle(title) {
   if (!title) return '';
   let t = title.toLowerCase();
-
   // Remove accents
   t = t.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-
-  // Remove punctuation and symbols
+  // Remove punctuation
   t = t.replace(/[^\w\s]/g, ' ');
-
-  // Remove common performer/filler phrases that differ between sources
+  // Remove common filler words and performer phrases that vary between sources
   const fillers = [
-    'live in concert', 'live', 'concert', 'tour', 'show', 'event',
-    'official', 'di', 'del', 'della', 'la', 'il', 'un', 'una', 'the', 'a', 'an',
-    'featuring', 'feat\\.?', 'ft\\.?', 'with', 'starring', 'presents', 'presenting'
+    'live in concert', 'live', 'concert', 'tour', 'show', 'event', 'official',
+    'the', 'a', 'an', 'di', 'del', 'della', 'la', 'il', 'un', 'una',
+    'featuring', 'feat', 'ft', 'with', 'starring', 'presents', 'presenting'
   ];
   fillers.forEach(word => {
-    const regex = new RegExp(`\\b${word}\\b`, 'gi');
+    const regex = new RegExp('\\b' + word + '\\b', 'gi');
     t = t.replace(regex, '');
   });
-
-  // Remove common trailing patterns like "Live In Concert", artist names after "featuring", etc.
-  t = t.replace(/\s+(live|concert|tour|featuring|feat\.?)\s+.*$/i, '');
-
+  // Remove trailing artist names after featuring etc.
+  t = t.replace(/\s+(featuring|feat|ft|with|starring)\s+.*$/, '');
   return t.replace(/\s+/g, ' ').trim();
 }
 
-function titleSimilarity(titleA, titleB) {
-  const a = normalizeForSimilarity(titleA).split(/\s+/).filter(Boolean);
-  const b = normalizeForSimilarity(titleB).split(/\s+/).filter(Boolean);
-
-  if (a.length === 0 || b.length === 0) return 0;
-
-  const setA = new Set(a);
-  const setB = new Set(b);
-
-  let intersection = 0;
-  for (let word of setA) {
-    if (setB.has(word)) intersection++;
-  }
-
-  const union = setA.size + setB.size - intersection;
-  return intersection / union;
-}
-
-// Stronger combined similarity using title + location + date
 function areEventsLikelyDuplicates(e1, e2) {
-  const titleSim = titleSimilarity(e1.title, e2.title);
+  const core1 = getCoreTitle(e1.title);
+  const core2 = getCoreTitle(e2.title);
 
-  // Normalize locations
+  if (!core1 || !core2) return false;
+
+  // Exact core match
+  if (core1 === core2) return true;
+
+  // One core contains the other (e.g. "sunday comedy club" contained in "sunday comedy club leslie gold")
+  if (core1.includes(core2) || core2.includes(core1)) return true;
+
+  // Same date and similar location
+  const sameDate = e1.event_date && e2.event_date && e1.event_date === e2.event_date;
   const loc1 = (e1.location || '').toLowerCase().replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim();
   const loc2 = (e2.location || '').toLowerCase().replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  const sameLoc = loc1 && loc2 && (loc1 === loc2 || loc1.includes(loc2) || loc2.includes(loc1));
 
-  const sameLocation = loc1 && loc2 && (loc1 === loc2 || loc1.includes(loc2) || loc2.includes(loc1));
+  if (sameDate && sameLoc) return true;
 
-  // Date match
-  const sameDate = e1.event_date && e2.event_date && e1.event_date === e2.event_date;
+  // Same image
+  if (e1.image_url && e2.image_url && e1.image_url === e2.image_url) return true;
 
-  let score = titleSim;
-
-  if (sameLocation) score += 0.22;
-  if (sameDate) score += 0.18;
-
-  return score;
+  return false;
 }
 
 function reviewDuplicates() {
-  const SIMILARITY_THRESHOLD = 0.65; // Using combined title + location + date similarity
-
   const events = E.filter(e => e.title && e.title.length > 3);
   const used = new Set();
   const duplicateGroups = [];
@@ -221,16 +201,12 @@ function reviewDuplicates() {
     for (let j = i + 1; j < events.length; j++) {
       if (used.has(events[j].id)) continue;
 
-      const combinedScore = areEventsLikelyDuplicates(events[i], events[j]);
-
-      const highOverlap = combinedScore >= SIMILARITY_THRESHOLD;
-
-      if (highOverlap) {
-        // Only group if they are from different sources or very high similarity
+      if (areEventsLikelyDuplicates(events[i], events[j])) {
         const sourceI = events[i].source_name || 'Unknown';
         const sourceJ = events[j].source_name || 'Unknown';
 
-        if (sourceI !== sourceJ || combinedScore > 0.9) {
+        // Only add if different sources (to focus on cross-source dups)
+        if (sourceI !== sourceJ) {
           group.push(events[j]);
           used.add(events[j].id);
         }
@@ -238,29 +214,31 @@ function reviewDuplicates() {
     }
 
     if (group.length >= 2) {
-      // Only keep groups that actually come from multiple sources
-      const uniqueSources = new Set(group.map(e => e.source_name || 'Unknown'));
-      if (uniqueSources.size >= 2) {
-        duplicateGroups.push(group);
-      }
+      duplicateGroups.push(group);
     }
   }
 
   if (duplicateGroups.length === 0) {
-    toast('No clear cross-source duplicates found with current sensitivity.');
+    toast('No duplicates from different sources found.');
     return;
   }
 
-  // Create a simple modal
+  // Create a simple modal with bulk checkboxes for delete
   const modal = document.createElement('div');
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+  modal.id = 'dupReviewModal';
   
   let html = `<div style="background:#1e293b;color:white;max-width:900px;width:100%;max-height:85vh;overflow:auto;border-radius:12px;padding:20px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
       <h3 style="margin:0">Review Duplicates from Different Sources (${duplicateGroups.length} groups)</h3>
-      <button onclick="this.closest('.modal-wrapper').remove()" style="background:#334155;color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer">Close</button>
+      <div>
+        <button onclick="selectAllInDupModal()" style="background:#334155;color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;margin-right:8px">Select All</button>
+        <button onclick="deselectAllInDupModal()" style="background:#334155;color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;margin-right:8px">Deselect All</button>
+        <button onclick="deleteSelectedInDupModal()" style="background:#ef4444;color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-weight:600">Delete Selected</button>
+        <button onclick="this.closest('#dupReviewModal').remove()" style="background:#334155;color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer">Close</button>
+      </div>
     </div>
-    <p style="color:#94a3b8;margin-bottom:16px">These events have very similar titles but come from different sources. Choose the best version to keep.</p>`;
+    <p style="color:#94a3b8;margin-bottom:16px">Check the versions (from any groups) that you want to <strong>delete</strong>. Then click "Delete Selected". Unchecked = kept.</p>`;
 
   duplicateGroups.forEach((group, groupIndex) => {
     html += `<div style="border:1px solid #334155;border-radius:8px;margin-bottom:20px;padding:12px">`;
@@ -274,15 +252,12 @@ function reviewDuplicates() {
       const date = e.event_date || 'No date';
       const venue = e.location ? ` — ${e.location}` : '';
       html += `
-        <div style="display:flex;justify-content:space-between;align-items:center;background:#0f172a;padding:10px;border-radius:6px;margin-bottom:6px">
-          <div>
+        <div style="display:flex;align-items:center;background:#0f172a;padding:10px;border-radius:6px;margin-bottom:6px">
+          <input type="checkbox" class="dup-check" data-id="${e.id}" style="margin-right:10px; transform:scale(1.2);">
+          <div style="flex:1">
             <div style="font-size:0.9rem">${source} — ${date}${venue}</div>
             <div style="font-size:0.75rem;color:#64748b">ID: ${e.id}</div>
           </div>
-          <button onclick="keepOneAndDeleteRest(${e.id}, [${group.map(x => x.id).join(',')}], this)" 
-                  style="background:#22c55e;color:white;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.85rem">
-            Keep This One
-          </button>
         </div>`;
     });
     html += `</div>`;
@@ -290,28 +265,8 @@ function reviewDuplicates() {
 
   html += `</div>`;
   modal.innerHTML = html;
-  modal.className = 'modal-wrapper';
+  modal.id = 'dupReviewModal';
   document.body.appendChild(modal);
-}
-
-function keepOneAndDeleteRest(keepId, allIds, buttonEl) {
-  const toDelete = allIds.filter(id => id !== keepId);
-  if (!confirm(`Keep event #${keepId} and delete the other ${toDelete.length}?`)) return;
-
-  api('POST', '/admin/api/events/batch-delete', { ids: toDelete }, function (res) {
-    if (res.success) {
-      toast(`Deleted ${toDelete.length} duplicates. Kept #${keepId}`);
-      // Remove deleted from local E
-      E = E.filter(e => !toDelete.includes(e.id));
-      // Refresh the view
-      const modal = buttonEl.closest('.modal-wrapper');
-      if (modal) modal.remove();
-      af4();
-      us();
-    } else {
-      toast('Failed to delete duplicates', 1);
-    }
-  });
 }
 
 function deleteSelected() {
@@ -328,6 +283,48 @@ function deleteSelected() {
       us();
     } else {
       toast('Error deleting events', 1);
+    }
+  });
+}
+
+// === Bulk delete helpers for the Duplicates Review modal ===
+
+function selectAllInDupModal() {
+  const modal = document.getElementById('dupReviewModal');
+  if (!modal) return;
+  modal.querySelectorAll('.dup-check').forEach(cb => cb.checked = true);
+}
+
+function deselectAllInDupModal() {
+  const modal = document.getElementById('dupReviewModal');
+  if (!modal) return;
+  modal.querySelectorAll('.dup-check').forEach(cb => cb.checked = false);
+}
+
+function deleteSelectedInDupModal() {
+  const modal = document.getElementById('dupReviewModal');
+  if (!modal) return;
+
+  const checked = modal.querySelectorAll('.dup-check:checked');
+  if (checked.length === 0) {
+    alert('No duplicates selected for deletion.');
+    return;
+  }
+
+  const ids = Array.from(checked).map(cb => parseInt(cb.getAttribute('data-id')));
+  if (!confirm(`Delete ${ids.length} selected duplicate versions? This cannot be undone.`)) return;
+
+  api('POST', '/admin/api/events/batch-delete', { ids }, function (res) {
+    if (res.success) {
+      toast(`Deleted ${res.deleted} duplicates.`);
+      // Remove from local E
+      E = E.filter(e => !ids.includes(e.id));
+      // Close modal and refresh
+      modal.remove();
+      af4();
+      us();
+    } else {
+      toast('Error deleting duplicates', 1);
     }
   });
 }
